@@ -150,15 +150,19 @@ function deviceFor(fingerprint) {
 }
 
 const ACCESS_COOKIE = "uniworld_access";
-function requestToken(req) {
+const VISITOR_COOKIE = "uniworld_visitor";
+function requestCookie(req, name) {
   const cookies = String(req.headers.cookie || "").split(";");
   for (const cookie of cookies) {
     const index = cookie.indexOf("=");
-    if (index < 0 || cookie.slice(0, index).trim() !== ACCESS_COOKIE) continue;
-    return decodeURIComponent(cookie.slice(index + 1).trim());
+    if (index < 0 || cookie.slice(0, index).trim() !== name) continue;
+    try { return decodeURIComponent(cookie.slice(index + 1).trim()); }
+    catch { return ""; }
   }
   return "";
 }
+function requestToken(req) { return requestCookie(req, ACCESS_COOKIE); }
+function requestVisitorToken(req) { return requestCookie(req, VISITOR_COOKIE); }
 
 function myPart(accessToken) {
   const token = String(accessToken || "");
@@ -168,6 +172,28 @@ function myPart(accessToken) {
     if (!part.access_hash || !/^[a-f0-9]{64}$/.test(part.access_hash)) return false;
     return timingSafeEqual(candidate, Buffer.from(part.access_hash, "hex"));
   }) || null;
+}
+
+// Clue progress belongs either to the world authenticated by its HttpOnly
+// capability, or to a separate, anonymous browser capability. Never accept an
+// owner identifier from a request body or query string as authorization.
+function clueIdentity(req) {
+  const part = myPart(requestToken(req));
+  if (part) return part.owner_id;
+  const token = requestVisitorToken(req);
+  return /^[A-Za-z0-9_-]{43}$/.test(token) ? `visitor:${sha256(token)}` : null;
+}
+
+function ensureClueIdentity(req, res) {
+  const authenticatedPart = myPart(requestToken(req));
+  if (authenticatedPart) return authenticatedPart.owner_id;
+  let token = requestVisitorToken(req);
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token)) {
+    token = randomBytes(32).toString("base64url");
+    const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+    res.setHeader("set-cookie", `${VISITOR_COOKIE}=${encodeURIComponent(token)}; Path=/api; HttpOnly; SameSite=Strict${secure}`);
+  }
+  return `visitor:${sha256(token)}`;
 }
 
 const SECURITY_HEADERS = {
@@ -381,15 +407,15 @@ async function removeSign(body, req) {
   return [200, { ok: true }];
 }
 
-async function collectClue(body, req) {
+async function collectClue(body, req, res) {
   const cx = Number(body.cx);
   const cy = Number(body.cy);
   const idx = Number(body.idx);
   if (!Number.isInteger(cx) || !Number.isInteger(cy) || !Number.isInteger(idx) || idx < 0 || idx > 2)
     return [400, { error: "pedido inválido." }];
-  const collector = myPart(requestToken(req));
-  if (!collector) return [403, { error: "token de acesso inválido." }];
-  const ownerId = collector.owner_id;
+  // An owned world uses its server-resolved identity. A visitor receives a
+  // clue-only capability, which cannot edit or claim any world.
+  const ownerId = ensureClueIdentity(req, res);
 
   const part = db.parts.find((p) => p.cx === cx && p.cy === cy);
   if (!part) return [404, { error: "peça não existe." }];
@@ -546,9 +572,9 @@ async function handleRequest(req, res) {
       const part = db.parts.find((p) => p.cx === cx && p.cy === cy);
       if (!part) return send(res, 404, { error: "peça vazia." });
       const piece = generatePiece(part.seed, cx, cy);
-      const viewer = myPart(requestToken(req));
+      const viewerId = clueIdentity(req);
       const clues = ["clue_a", "clue_b", "clue_c"].map((field, idx) =>
-        viewer && db.clues.some((c) => c.owner_id === viewer.owner_id && c.cx === cx && c.cy === cy && c.idx === idx)
+        viewerId && db.clues.some((c) => c.owner_id === viewerId && c.cx === cx && c.cy === cy && c.idx === idx)
           ? part[field]
           : null,
       );
@@ -571,15 +597,14 @@ async function handleRequest(req, res) {
     }
 
     if (path === "/api/clues" && req.method === "GET") {
-      const player = myPart(requestToken(req));
-      if (!player) return send(res, 403, { error: "token de acesso inválido." });
+      const ownerId = ensureClueIdentity(req, res);
       return send(res, 200, {
-        clues: db.clues.filter((c) => c.owner_id === player.owner_id).map((c) => ({ cx: c.cx, cy: c.cy, idx: c.idx })),
+        clues: db.clues.filter((c) => c.owner_id === ownerId).map((c) => ({ cx: c.cx, cy: c.cy, idx: c.idx })),
       });
     }
 
     if (path === "/api/clue" && req.method === "POST") {
-      const [status, payload] = await collectClue(await readBody(req), req);
+      const [status, payload] = await collectClue(await readBody(req), req, res);
       return send(res, status, payload);
     }
 
