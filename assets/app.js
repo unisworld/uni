@@ -92,7 +92,7 @@ async function messageBlock(state) {
 
 async function viewMap() {
   const state = STATIC_PREVIEW ? { parts: [], occupied: 0, total: 2000, empties: 2000, bordersOpen: false } : await api("/api/state");
-  const mine = STATIC_PREVIEW ? null : await api(`/api/mine?fp=${encodeURIComponent(fp)}`).catch(() => null);
+  const mine = STATIC_PREVIEW ? null : await api("/api/mine").catch(() => null);
   const byCell = new Map(state.parts.map((p) => [p.cx + "," + p.cy, p]));
   let cells = "";
   for (let cy = 0; cy < GRID_H; cy++) {
@@ -110,7 +110,7 @@ async function viewMap() {
         <p class="kicker">seu mundo</p>
         <h2 style="margin-top:8px">${esc(mine.part.name)}</h2>
         <p class="note">${BIOME_LABEL[mine.part.biome]} · ${mine.part.cx},${mine.part.cy} · ${climateWord(mine.part.climate)}</p>
-        <p class="hint">este aparelho já entregou a sua peça. o mundo é um por dispositivo.</p>
+        <p class="hint">este perfil de navegador já entregou uma peça. A identificação pode ser contornada; não é possível garantir uma peça por aparelho apenas pelo navegador.</p>
         <div class="actions">
           <a class="btn solid" href="#/mundo/${mine.part.cx}/${mine.part.cy}">entrar no meu mundo</a>
           <a class="btn" href="#/editar">editar</a>
@@ -188,7 +188,7 @@ async function viewClaim() {
             <input id="c3" maxlength="120" />
           </div>
           <p class="hint">a posição é sorteada entre as vazias. você não escolhe vizinho. o terreno é função da coordenada, então a emenda com o entorno é automática.</p>
-          <p class="hint">um mundo por aparelho: a peça fica presa a este dispositivo e você não poderá criar outra.</p>
+          <p class="hint">a peça fica associada ao identificador deste navegador. Isso é apenas uma barreira de conveniência: dados do navegador podem ser apagados ou forjados, então não garante uma peça por aparelho.</p>
           <div class="actions">
             <button class="btn solid" type="submit">entregar parte</button>
             <a class="btn" href="#/">voltar ao mapa</a>
@@ -235,7 +235,7 @@ async function viewClaim() {
     } catch (err) {
       errEl.className = "error";
       errEl.innerHTML = `${esc(err.message)} ${
-        /aparelho|conexão|mundo já/i.test(err.message) ? '<a href="#/editar" style="color:var(--ocre)">abrir o meu mundo</a>' : ""
+        /mundo já/i.test(err.message) ? '<a href="#/editar" style="color:var(--ocre)">abrir o meu mundo</a>' : ""
       }`;
       btn.disabled = false;
       btn.textContent = "entregar parte";
@@ -246,14 +246,14 @@ async function viewClaim() {
 /* ---------------- meu mundo ---------------- */
 
 async function viewEdit() {
-  const mine = await api(`/api/mine?fp=${encodeURIComponent(fp)}`).catch(() => null);
+  const mine = await api("/api/mine").catch(() => null);
 
   if (!mine) {
     app.innerHTML = layout(`
       <section style="padding:48px 0 24px;max-width:640px">
-        <p class="kicker">nenhum mundo aqui</p>
-        <h1 style="font-size:2rem">este aparelho ainda não entregou uma parte.</h1>
-        <p class="hint">cada aparelho entrega uma peça só. se você criou um mundo em outro navegador deste mesmo aparelho, ele aparece aqui mesmo assim: a peça está presa ao dispositivo.</p>
+        <p class="kicker">nenhum mundo acessível neste navegador</p>
+        <h1 style="font-size:2rem">não há um mundo associado ao cookie atual.</h1>
+        <p class="hint">se você já contribuiu e apagou os dados do navegador ou trocou de perfil, o cookie de acesso pode ter sido perdido. O sistema não consegue provar que o novo perfil é o mesmo aparelho nem recuperar o acesso automaticamente; procure o operador antes de tentar uma nova entrega.</p>
         <div class="actions"><a class="btn solid" href="#/">ir ao mapa</a></div>
       </section>`);
     return;
@@ -338,7 +338,6 @@ async function viewEdit() {
     msg.className = "hint";
     try {
       await api("/api/mine", {
-        fp,
         name: document.getElementById("name").value.trim(),
         welcome: document.getElementById("welcome").value.trim(),
         instagram: document.getElementById("insta").value.trim(),
@@ -346,7 +345,7 @@ async function viewEdit() {
       });
       msg.textContent = "salvo.";
       msg.className = "hint ok";
-      const reload = await api(`/api/mine?fp=${encodeURIComponent(fp)}`);
+      const reload = await api("/api/mine");
       if (!reload.canRename) document.getElementById("name").setAttribute("disabled", "disabled");
     } catch (err) {
       msg.textContent = err.message;
@@ -361,7 +360,7 @@ async function viewEdit() {
     msg.textContent = "";
     if (!input.value.trim()) return;
     try {
-      await api("/api/sign", { fp, text: input.value.trim() });
+      await api("/api/sign", { text: input.value.trim() });
       location.hash = "#/editar";
       router();
     } catch (err) {
@@ -374,7 +373,7 @@ async function viewEdit() {
     const btn = e.target.closest("[data-remove]");
     if (!btn) return;
     try {
-      await api("/api/sign/delete", { fp, id: btn.dataset.remove });
+      await api("/api/sign/delete", { id: btn.dataset.remove });
       router();
     } catch (err) {
       const msg = document.getElementById("sign-msg");
@@ -484,7 +483,8 @@ async function viewWorld(cx, cy) {
 
   async function collect(idx, x, z) {
     try {
-      await api("/api/clue", { cx, cy, idx, x, z, ownerId: owner });
+      const collected = await api("/api/clue", { cx, cy, idx, x, z, ownerId: owner });
+      part.clues[idx] = collected.clue;
       got.add(idx);
       const chip = document.getElementById("mode");
       if (chip) chip.textContent = `${realm && realm.isCameraOn() ? "câmera" : "órbita"} · pistas ${got.size}/3`;
@@ -621,7 +621,7 @@ async function viewAbout() {
 
 async function viewRules() {
   const rules = [
-    ["um mundo por aparelho", "a peça fica presa ao dispositivo, por impressão digital. nem outro navegador libera uma segunda."],
+    ["uma peça por perfil (não por aparelho)", "a identificação usa dados controlados pelo navegador e pode ser apagada ou forjada. Sem autenticação externa e verificação, não há como garantir uma peça por aparelho."],
     ["a posição não se escolhe", "o servidor sorteia entre as vazias."],
     ["o texto é seu, o mundo não", "boas-vindas até 200 caracteres, pistas até 120, placas até 90. nada de link."],
     ["o nome muda uma vez", "depois de trocado, fica selado para sempre."],

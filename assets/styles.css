@@ -543,6 +543,7 @@ textarea:focus {
 }
 
 .seal-line {
+  white-space: pre-line;
   font-size: 13.5px;
   line-height: 1.95;
   color: rgba(230, 226, 218, 0.72);
