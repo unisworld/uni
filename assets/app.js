@@ -11,7 +11,144 @@ const STATIC_PREVIEW = location.hostname.endsWith(".github.io");
 const PIX_KEY = "ab3a2cd5-6283-4fab-9676-905ccd7d8d0c";
 let realm = null;
 let ambience = null;
+let fullscreenCleanup = null;
 let routeEpoch = 0;
+
+function setupWorldFullscreen(stage) {
+  const button = stage.querySelector("#fullscreen");
+  let active = false;
+  let fallbackActive = false;
+  let disposed = false;
+  let savedOverflow = null;
+
+  function lockPageScroll() {
+    if (savedOverflow) return;
+    const html = document.documentElement;
+    const body = document.body;
+    savedOverflow = {
+      html: [html.style.getPropertyValue("overflow"), html.style.getPropertyPriority("overflow")],
+      body: [body.style.getPropertyValue("overflow"), body.style.getPropertyPriority("overflow")],
+    };
+    html.style.setProperty("overflow", "hidden");
+    body.style.setProperty("overflow", "hidden");
+  }
+
+  function restorePageScroll() {
+    if (!savedOverflow) return;
+    const restore = (element, [value, priority]) => {
+      if (value) element.style.setProperty("overflow", value, priority);
+      else element.style.removeProperty("overflow");
+    };
+    restore(document.documentElement, savedOverflow.html);
+    restore(document.body, savedOverflow.body);
+    savedOverflow = null;
+  }
+
+  function paintState() {
+    stage.classList.toggle("is-world-fullscreen", active);
+    stage.classList.toggle("is-world-fullscreen-fallback", fallbackActive);
+    button.textContent = active ? "sair da tela cheia" : "tela cheia";
+    button.setAttribute("aria-label", active ? "Sair da tela cheia" : "Abrir mundo em tela cheia");
+    button.setAttribute("aria-pressed", String(active));
+  }
+
+  function syncNativeState() {
+    if (disposed) return;
+    const nativeActive = document.fullscreenElement === stage;
+    if (nativeActive) {
+      active = true;
+      fallbackActive = false;
+      lockPageScroll();
+    } else if (active && !fallbackActive) {
+      active = false;
+      restorePageScroll();
+    }
+    paintState();
+  }
+
+  function enterFallback() {
+    if (disposed || !stage.isConnected) return;
+    active = true;
+    fallbackActive = true;
+    lockPageScroll();
+    paintState();
+  }
+
+  function exitNativeFullscreen() {
+    if (document.fullscreenElement !== stage || !document.exitFullscreen) return;
+    try {
+      const exit = document.exitFullscreen();
+      if (exit && typeof exit.catch === "function") exit.catch(() => {});
+    } catch (_) {}
+  }
+
+  function leaveFullscreen() {
+    if (!active && document.fullscreenElement !== stage) return;
+    active = false;
+    fallbackActive = false;
+    stage.classList.remove("is-world-fullscreen", "is-world-fullscreen-fallback");
+    restorePageScroll();
+    paintState();
+    exitNativeFullscreen();
+  }
+
+  function onButtonClick() {
+    if (active) {
+      leaveFullscreen();
+      return;
+    }
+    // requestFullscreen must run synchronously from this click to retain the
+    // browser's user-gesture permission. Older mobile browsers use the overlay.
+    if (typeof stage.requestFullscreen !== "function") {
+      enterFallback();
+      return;
+    }
+    try {
+      const request = stage.requestFullscreen();
+      Promise.resolve(request).then(() => {
+        if (disposed) {
+          exitNativeFullscreen();
+          return;
+        }
+        syncNativeState();
+      }).catch(() => {
+        if (!disposed && document.fullscreenElement !== stage) enterFallback();
+      });
+    } catch (_) {
+      enterFallback();
+    }
+  }
+
+  function onKeyDown(event) {
+    if (event.key === "Escape" && fallbackActive) {
+      event.preventDefault();
+      leaveFullscreen();
+    }
+  }
+
+  button.addEventListener("click", onButtonClick);
+  document.addEventListener("fullscreenchange", syncNativeState);
+  window.addEventListener("keydown", onKeyDown);
+
+  return function cleanupFullscreen() {
+    if (disposed) return;
+    disposed = true;
+    button.removeEventListener("click", onButtonClick);
+    document.removeEventListener("fullscreenchange", syncNativeState);
+    window.removeEventListener("keydown", onKeyDown);
+    exitNativeFullscreen();
+    active = false;
+    fallbackActive = false;
+    stage.classList.remove("is-world-fullscreen", "is-world-fullscreen-fallback");
+    restorePageScroll();
+  };
+}
+
+function clearWorldFullscreen() {
+  if (!fullscreenCleanup) return;
+  fullscreenCleanup();
+  fullscreenCleanup = null;
+}
 
 const owner = (() => {
   const key = "uniworld:owner";
@@ -388,7 +525,7 @@ async function viewEdit() {
 
 async function viewWorld(cx, cy, routeToken) {
   const data = await api(`/api/part/${cx}/${cy}`);
-  const clues = await api(`/api/clues?owner=${encodeURIComponent(owner)}`).catch(() => ({ clues: [] }));
+  const clues = await api("/api/clues").catch(() => ({ clues: [] }));
   if (routeToken !== routeEpoch) return;
   const got = new Set(clues.clues.filter((c) => c.cx === cx && c.cy === cy).map((c) => c.idx));
   const part = data.part;
@@ -407,6 +544,7 @@ async function viewWorld(cx, cy, routeToken) {
             <button class="btn" id="sound" type="button" aria-pressed="false" aria-label="Ativar som do mundo">som: ativando…</button>
             <button class="btn" id="recenter" type="button">recentrar</button>
             <button class="btn" id="cam" type="button">câmera</button>
+            <button class="btn" id="fullscreen" type="button" aria-pressed="false" aria-label="Abrir mundo em tela cheia">tela cheia</button>
           </div>
         </div>
         <div class="bubble hidden" id="bubble"></div>
@@ -434,6 +572,7 @@ async function viewWorld(cx, cy, routeToken) {
     </div>`);
 
   const stage = document.getElementById("stage");
+  fullscreenCleanup = setupWorldFullscreen(stage);
   const bubble = document.getElementById("bubble");
   const collectBtn = document.getElementById("collect");
   let nearClue = null;
@@ -460,7 +599,7 @@ async function viewWorld(cx, cy, routeToken) {
     },
     onMetrics: (m) => {
       const el = document.getElementById("metrics");
-      if (el) el.textContent = `${m.crowd} cidadãos · ${m.drawCalls} draw calls · ${m.triangles} triângulos · ${m.ms} ms/frame`;
+      if (el) el.textContent = `${m.crowd} cidadãos · ${m.drawCalls} draw calls · ${m.triangles} triângulos · ${m.ms} ms/frame · ${m.pixelRatio}×`;
     },
     onNear: (near) => {
       if (!near) {
@@ -515,7 +654,7 @@ async function viewWorld(cx, cy, routeToken) {
 
   async function collect(idx, x, z) {
     try {
-      const collected = await api("/api/clue", { cx, cy, idx, x, z, ownerId: owner });
+      const collected = await api("/api/clue", { cx, cy, idx, x, z });
       part.clues[idx] = collected.clue;
       got.add(idx);
       const chip = document.getElementById("mode");
@@ -674,6 +813,7 @@ async function viewRules() {
 
 async function router() {
   const routeToken = ++routeEpoch;
+  clearWorldFullscreen();
   if (realm) {
     realm.dispose();
     realm = null;

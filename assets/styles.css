@@ -563,3 +563,69 @@ textarea:focus {
 .hint.error {
   color: #e2a1a1;
 }
+/* Mundo em tela cheia: o stage segue sendo o mesmo viewport WebGL, inclusive no fallback móvel. */
+.stage:fullscreen,
+.stage.is-world-fullscreen-fallback {
+  position: fixed !important;
+  inset: 0;
+  z-index: 10000;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: #0a0d11;
+  max-width: none;
+}
+
+.stage.is-world-fullscreen-fallback {
+  /* Cobertura opaca: header, painel e rodapé deixam de aparecer sem remover o mundo. */
+  isolation: isolate;
+}
+
+.stage:fullscreen .hud-top,
+.stage.is-world-fullscreen-fallback .hud-top {
+  padding-top: max(12px, env(safe-area-inset-top));
+  padding-right: max(12px, env(safe-area-inset-right));
+  padding-left: max(12px, env(safe-area-inset-left));
+}
+
+.stage:fullscreen .pad,
+.stage.is-world-fullscreen-fallback .pad {
+  left: max(18px, env(safe-area-inset-left));
+  bottom: max(18px, env(safe-area-inset-bottom));
+}
+
+.stage:fullscreen .collect,
+.stage.is-world-fullscreen-fallback .collect {
+  bottom: max(108px, calc(env(safe-area-inset-bottom) + 88px));
+}
+
+.stage:fullscreen .hud-btns,
+.stage.is-world-fullscreen-fallback .hud-btns {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 560px) {
+  .stage:fullscreen .hud-top,
+  .stage.is-world-fullscreen-fallback .hud-top {
+    gap: 6px;
+    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 8px max(8px, env(safe-area-inset-left));
+  }
+
+  .stage:fullscreen .hud-btns,
+  .stage.is-world-fullscreen-fallback .hud-btns {
+    max-width: 72%;
+    gap: 5px;
+  }
+
+  .stage:fullscreen .hud-btns .btn,
+  .stage.is-world-fullscreen-fallback .hud-btns .btn {
+    padding: 8px 9px;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+  }
+}

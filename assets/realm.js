@@ -86,9 +86,21 @@ export function createRealm(container, opts = {}) {
   }
 
   const pixelRatioCap = lowPower ? 1.5 : 2;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, pixelRatioCap));
+  const basePixelRatio = Math.min(window.devicePixelRatio || 1, pixelRatioCap);
+  let resolutionScale = 1;
+  renderer.setPixelRatio(basePixelRatio);
   renderer.domElement.style.cssText = "display:block;width:100%;height:100%;touch-action:none;";
   container.appendChild(renderer.domElement);
+
+  // Adaptive resolution changes only the backing buffer; CSS size, camera framing,
+  // movement, hit targets and world coordinates stay untouched.
+  function setResolutionScale(next) {
+    const target = Math.max(0.72, Math.min(1, next));
+    if (Math.abs(target - resolutionScale) < 0.001) return;
+    resolutionScale = target;
+    renderer.setPixelRatio(basePixelRatio * resolutionScale);
+    renderer.setSize(container.clientWidth || 1, container.clientHeight || 1, false);
+  }
 
   /* ---------- céu e luz ---------- */
 
@@ -144,18 +156,18 @@ export function createRealm(container, opts = {}) {
   /* ---------- água ---------- */
 
   const WATER_COLOR = {
-    oceano: 0x356d7a,
-    costa: 0x4b8586,
-    campina: 0x356e79,
-    mata: 0x285b62,
-    serra: 0x58727c,
+    oceano: 0x5d8589,
+    costa: 0x78a4a0,
+    campina: 0x658e8b,
+    mata: 0x4c7672,
+    serra: 0x71878d,
   };
   const water = new THREE.Mesh(
     new THREE.CircleGeometry(80, 48),
     new THREE.MeshPhongMaterial({
       color: WATER_COLOR[piece.biome] || WATER_COLOR.campina,
-      specular: 0x9db8bc,
-      shininess: 42,
+      specular: 0xd4e1d8,
+      shininess: 58,
       transparent: true,
       opacity: 0.94,
     }),
@@ -234,7 +246,9 @@ export function createRealm(container, opts = {}) {
     for (let i = 0; i < trees; i++) {
       const spot = freeSpot(3.2, 9.6);
       const y = h(spot.x, spot.z);
-      const scale = 0.8 + rnd() * 0.7;
+      // Small woodland trees read too much like shrubs beside a ~1.6-unit citizen.
+      // Keep their bases and spacing, but give the canopy a more legible 2–3 unit height.
+      const scale = 1.05 + rnd() * 0.4;
       dummy.position.set(spot.x, y + 0.55 * scale, spot.z);
       dummy.rotation.set(0, rnd() * Math.PI, 0);
       dummy.scale.set(scale, scale, scale);
@@ -786,7 +800,13 @@ export function createRealm(container, opts = {}) {
   let paused = false;
   let lastNearIdx = -1;
   let frameCount = 0;
-  const startedAt = performance.now();
+  const FRAME_WINDOW = 90;
+  const frameTimes = new Float32Array(FRAME_WINDOW);
+  let frameSamples = 0;
+  let frameTimeIndex = 0;
+  let frameTimeTotal = 0;
+  let perfCheckSamples = 0;
+  let lastFrameAt = 0;
 
   function steer(dt) {
     for (let i = 0; i < actors.length; i++) {
@@ -867,6 +887,28 @@ export function createRealm(container, opts = {}) {
   function tick() {
     raf = requestAnimationFrame(tick);
     if (paused) return;
+
+    const frameAt = performance.now();
+    if (lastFrameAt) {
+      const elapsed = Math.min(100, frameAt - lastFrameAt);
+      if (frameSamples === FRAME_WINDOW) frameTimeTotal -= frameTimes[frameTimeIndex];
+      else frameSamples++;
+      frameTimes[frameTimeIndex] = elapsed;
+      frameTimeTotal += elapsed;
+      frameTimeIndex = (frameTimeIndex + 1) % FRAME_WINDOW;
+
+      if (frameSamples === FRAME_WINDOW && ++perfCheckSamples >= FRAME_WINDOW) {
+        const meanFrameMs = frameTimeTotal / FRAME_WINDOW;
+        perfCheckSamples = 0;
+        // Hysteresis avoids flicker: reduce pixel cost only after sustained slow frames,
+        // and restore detail more gently once there is consistent headroom.
+        if (meanFrameMs > 30) setResolutionScale(resolutionScale - 0.12);
+        else if (meanFrameMs > 22) setResolutionScale(resolutionScale - 0.08);
+        else if (meanFrameMs < 16.8) setResolutionScale(resolutionScale + 0.04);
+      }
+    }
+    lastFrameAt = frameAt;
+
     const dt = Math.min(0.05, clock.getDelta());
     const t = clock.elapsedTime;
 
@@ -974,10 +1016,11 @@ export function createRealm(container, opts = {}) {
 
     renderer.render(scene, camera);
     frameCount++;
-    if (frameCount === 120) {
+    if (frameCount >= 120 && frameCount % 120 === 0) {
       opts.onMetrics &&
         opts.onMetrics({
-          ms: Math.round(((performance.now() - startedAt) / frameCount) * 100) / 100,
+          ms: Math.round((frameTimeTotal / Math.max(1, frameSamples)) * 100) / 100,
+          pixelRatio: Math.round(basePixelRatio * resolutionScale * 100) / 100,
           drawCalls: renderer.info.render.calls,
           triangles: renderer.info.render.triangles,
           crowd: crowdCount,
@@ -998,7 +1041,15 @@ export function createRealm(container, opts = {}) {
 
   const onVisibility = () => {
     paused = document.hidden;
-    if (!paused) clock.getDelta();
+    lastFrameAt = 0;
+    if (paused) {
+      frameSamples = 0;
+      frameTimeIndex = 0;
+      frameTimeTotal = 0;
+      perfCheckSamples = 0;
+    } else {
+      clock.getDelta();
+    }
   };
   document.addEventListener("visibilitychange", onVisibility);
 
