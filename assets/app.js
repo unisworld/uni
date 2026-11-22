@@ -248,7 +248,7 @@ async function viewMap() {
         <p class="kicker">seu mundo</p>
         <h2 style="margin-top:8px">${esc(mine.part.name)}</h2>
         <p class="note">${BIOME_LABEL[mine.part.biome]} · ${mine.part.cx},${mine.part.cy} · ${climateWord(mine.part.climate)}</p>
-        <p class="hint">este perfil de navegador já entregou uma peça. A identificação pode ser contornada; não é possível garantir uma peça por aparelho apenas pelo navegador.</p>
+        <p class="hint">Que bom ter você de volta. Sua parte está esperando por você.</p>
         <div class="actions">
           <a class="btn solid" href="#/mundo/${mine.part.cx}/${mine.part.cy}">entrar no meu mundo</a>
           <a class="btn" href="#/editar">editar</a>
@@ -260,10 +260,10 @@ async function viewMap() {
     <section class="hero">
       <div>
         <p class="kicker">projeto aberto${STATIC_PREVIEW ? " · prévia estática" : ""}</p>
-        ${STATIC_PREVIEW ? `<p class="hint">Prévia do mapa: os dados e as contribuições ainda não estão disponíveis. Para ativá-los, é preciso conectar o servidor do projeto.</p>` : ""}
+        ${STATIC_PREVIEW ? `<p class="hint">Esta é uma prévia do mapa. Para visitar os mundos e participar, acesse a versão completa do UniWorld.</p>` : ""}
         <h1>Um mundo em duas mil partes.</h1>
-        <p class="lede">Cada pessoa entrega uma parte. O sistema decide onde ela cabe. Ninguém escolhe vizinho.</p>
-        <p class="lede" style="margin-top:10px">Quando as duas mil estiverem no lugar, o centro do mapa abre uma mensagem.</p>
+        <p class="lede">Cada pessoa traz uma parte, e ela encontra seu lugar no mapa. É assim que um mundo compartilhado começa a nascer.</p>
+        <p class="lede" style="margin-top:10px">Quando as duas mil partes estiverem reunidas, uma mensagem será revelada no centro do mapa.</p>
         <div class="actions">
           ${mine || STATIC_PREVIEW ? "" : `<a class="btn solid" href="#/entregar">receber uma parte</a>`}
           <a class="btn" href="#/sobre">como funciona</a>
@@ -325,8 +325,8 @@ async function viewClaim() {
             <label for="c3">pista 3 (opcional)</label>
             <input id="c3" maxlength="120" />
           </div>
-          <p class="hint">a posição é sorteada entre as vazias. você não escolhe vizinho. o terreno é função da coordenada, então a emenda com o entorno é automática.</p>
-          <p class="hint">a peça fica associada ao identificador deste navegador. Isso é apenas uma barreira de conveniência: dados do navegador podem ser apagados ou forjados, então não garante uma peça por aparelho.</p>
+          <p class="hint">Sua parte vai encontrar um lugar entre os espaços disponíveis. A posição é sorteada, assim como a vizinhança que você vai descobrir.</p>
+          <p class="hint">O acesso ao seu mundo fica guardado neste navegador. Se você apagar os dados dele, trocar de navegador ou de aparelho, pode perder o acesso; a recuperação não é automática.</p>
           <div class="actions">
             <button class="btn solid" type="submit">entregar parte</button>
             <a class="btn" href="#/">voltar ao mapa</a>
@@ -363,7 +363,7 @@ async function viewClaim() {
         <div class="field">
           <label>seu código</label>
           <p class="code">${esc(res.code)}</p>
-          <p class="hint">aparece uma única vez. ele não abre nada sozinho: entra na soma dos quatro códigos das bordas. os dois abaixo são falsos — conte-os a quem quiser, e guarde o verdadeiro.</p>
+          <p class="hint">Guarde seu código verdadeiro com carinho: ele aparece só desta vez e fará parte do mistério das quatro bordas. Os outros dois são falsos; você pode compartilhá-los com quem quiser.</p>
           <p class="hint">${res.options.map((o, i) => `<span style="border:1px solid var(--line);padding:4px 8px;margin-right:6px;${i === res.realIdx ? "border-color:rgba(200,164,92,.6);color:var(--ocre)" : ""}">${esc(o)}</span>`).join("")}</p>
         </div>
         <div class="actions">
@@ -389,9 +389,9 @@ async function viewEdit() {
   if (!mine) {
     app.innerHTML = layout(`
       <section style="padding:48px 0 24px;max-width:640px">
-        <p class="kicker">nenhum mundo acessível neste navegador</p>
-        <h1 style="font-size:2rem">não há um mundo associado ao cookie atual.</h1>
-        <p class="hint">se você já contribuiu e apagou os dados do navegador ou trocou de perfil, o cookie de acesso pode ter sido perdido. O sistema não consegue provar que o novo perfil é o mesmo aparelho nem recuperar o acesso automaticamente; procure o operador antes de tentar uma nova entrega.</p>
+        <p class="kicker">meu mundo</p>
+        <h1 style="font-size:2rem">ainda não encontramos seu mundo aqui.</h1>
+        <p class="hint">Se você já criou uma parte, tente voltar ao navegador e ao aparelho que usou para criá-la. Apagar os dados do navegador também pode fazer você perder o acesso, e a recuperação não é automática. Se precisar de ajuda, fale com a gente em <a href="mailto:miatsupport@gmail.com">miatsupport@gmail.com</a> antes de tentar criar outra parte.</p>
         <div class="actions"><a class="btn solid" href="#/">ir ao mapa</a></div>
       </section>`);
     return;
@@ -410,7 +410,7 @@ async function viewEdit() {
           <div class="field">
             <label for="name">nome ${mine.canRename ? "" : "(selado)"}</label>
             <input id="name" maxlength="40" value="${esc(part.name)}" ${mine.canRename ? "" : "disabled"} />
-            <p class="hint">${mine.canRename ? "o nome só pode ser trocado uma vez, para sempre." : "o nome já foi trocado uma vez e está selado."}</p>
+            <p class="hint">${mine.canRename ? "Você pode trocar o nome uma única vez. Escolha com carinho." : "O nome já foi alterado e agora permanece assim."}</p>
           </div>
           <div class="field">
             <label for="welcome">boas-vindas (até 200)</label>
@@ -445,7 +445,7 @@ async function viewEdit() {
               ? mine.signs
                   .map((s) => `<li><span>${esc(s.text)}</span><button class="btn" data-remove="${s.id}" type="button">remover</button></li>`)
                   .join("")
-              : `<li>nenhuma placa ainda.</li>`
+              : `<li>Seu mundo ainda não tem placas.</li>`
           }
         </ul>
         <form id="sign" class="actions" style="margin-top:12px">
@@ -481,7 +481,7 @@ async function viewEdit() {
         instagram: document.getElementById("insta").value.trim(),
         climate,
       });
-      msg.textContent = "salvo.";
+      msg.textContent = "Suas mudanças foram salvas.";
       msg.className = "hint ok";
       const reload = await api("/api/mine");
       if (!reload.canRename) document.getElementById("name").setAttribute("disabled", "disabled");
@@ -562,12 +562,11 @@ async function viewWorld(cx, cy, routeToken) {
             .map((text, i) =>
               got.has(i)
                 ? `<li><b>pista ${i + 1}</b>${esc(text)}</li>`
-                : `<li><b>não coletada</b>caminhe até o octaedro ocre e toque nele.</li>`,
+                : `<li><b>não coletada</b>Caminhe até a forma dourada e toque nela para descobrir a pista.</li>`,
             )
             .join("")}
         </ul>
-        <p class="note" style="margin-top:20px">arraste para girar, use o direcional para andar. o botão de câmera ancora o mundo à frente do aparelho.</p>
-        <p class="note" id="metrics"></p>
+        <p class="note" style="margin-top:20px">Arraste para olhar ao redor e use o direcional para caminhar. Se quiser, experimente o botão de câmera para trazer o mundo para perto de você.</p>
       </aside>
     </div>`);
 
@@ -596,10 +595,6 @@ async function viewWorld(cx, cy, routeToken) {
     onStatus: (m) => {
       const chip = document.getElementById("mode");
       if (chip) chip.textContent = `${m === "camera" ? "câmera" : "órbita"} · pistas ${got.size}/3`;
-    },
-    onMetrics: (m) => {
-      const el = document.getElementById("metrics");
-      if (el) el.textContent = `${m.crowd} cidadãos · ${m.drawCalls} draw calls · ${m.triangles} triângulos · ${m.ms} ms/frame · ${m.pixelRatio}×`;
     },
     onNear: (near) => {
       if (!near) {
@@ -661,7 +656,7 @@ async function viewWorld(cx, cy, routeToken) {
       if (chip) chip.textContent = `${realm && realm.isCameraOn() ? "câmera" : "órbita"} · pistas ${got.size}/3`;
       document.getElementById("clues").innerHTML = part.clues
         .map((text, i) =>
-          got.has(i) ? `<li><b>pista ${i + 1}</b>${esc(text)}</li>` : `<li><b>não coletada</b>caminhe até o octaedro ocre e toque nele.</li>`,
+          got.has(i) ? `<li><b>pista ${i + 1}</b>${esc(text)}</li>` : `<li><b>não coletada</b>Caminhe até a forma dourada e toque nela para descobrir a pista.</li>`,
         )
         .join("");
       collectBtn.classList.add("hidden");
@@ -737,7 +732,7 @@ async function viewPart(id) {
     <section style="padding:40px 0 24px;max-width:760px">
       <p class="kicker">peça ${part.cx},${part.cy}</p>
       <h1 style="font-size:2.4rem;margin-top:14px">${esc(part.name)}</h1>
-      <p class="meta note">${BIOME_LABEL[part.biome]} · ${data.local.population} cidadãos · semente ${esc(part.seed)}</p>
+      <p class="meta note">${BIOME_LABEL[part.biome]} · ${data.local.population} cidadãos</p>
       ${part.instagram ? `<p class="meta note"><a href="https://instagram.com/${esc(part.instagram)}" target="_blank" rel="noreferrer" style="color:var(--ocre)">@${esc(part.instagram)}</a></p>` : ""}
       <p class="quote">${esc(part.welcome)}</p>
       <div class="actions">
@@ -754,15 +749,16 @@ async function viewState() {
   const pct = (state.occupied / state.total) * 100;
   app.innerHTML = layout(`
     <section style="padding:48px 0 24px">
-      <p class="kicker">contador público</p>
+      <p class="kicker">a jornada até aqui</p>
       <h1 style="font-size:2.2rem">estado do mundo</h1>
+      <p class="lede">Acompanhe como o UniWorld está crescendo, uma parte de cada vez.</p>
       <dl class="stats">
         <div><dt>entregues</dt><dd>${state.occupied}</dd></div>
-        <div><dt>tentativas</dt><dd>${state.tentativas}</dd></div>
-        <div><dt>bordas</dt><dd style="color:var(--ocre)">${state.bordersOpen ? "abertas" : "seladas"}</dd></div>
+        <div><dt>lugares disponíveis</dt><dd>${state.empties}</dd></div>
+        <div><dt>bordas</dt><dd style="color:var(--ocre)">${state.bordersOpen ? "disponíveis" : "reservadas"}</dd></div>
       </dl>
       <div class="bar"><i style="width:${Math.max(pct, 0.4)}%"></i></div>
-      <p class="note">${Math.round(pct * 10) / 10}% · ${state.rejeitadas} recusadas na emenda</p>
+      <p class="note">${Math.round(pct * 10) / 10}% do mundo preenchido</p>
       <h2 style="margin-top:36px">últimas partes</h2>
       <ul class="list">
         ${state.parts
@@ -771,7 +767,7 @@ async function viewState() {
             (p) =>
               `<li><a href="#/mundo/${p.cx}/${p.cy}">${esc(p.name)}</a><span>${BIOME_LABEL[p.biome]} · ${p.cx},${p.cy}</span></li>`,
           )
-          .join("") || `<li>nenhuma parte entregue ainda.</li>`}
+          .join("") || `<li>O primeiro pedacinho ainda está esperando para chegar.</li>`}
       </ul>
     </section>`);
 }
@@ -780,29 +776,32 @@ async function viewAbout() {
   app.innerHTML = layout(`
     <section style="padding:48px 0 24px;max-width:680px">
       <p class="kicker">sobre</p>
-      <h1 style="font-size:2.2rem">um mundo feito por estranhos</h1>
+      <h1 style="font-size:2.2rem">um mundo que construímos juntos</h1>
       <div class="prose">
-        <p>Uniworld é um mundo feito em pedaços por gente que nunca se falou. Cada pessoa entrega uma parte; o sistema decide onde ela cabe; ninguém escolhe vizinho. Quando as duas mil partes estiverem no lugar, o centro do mapa abre uma mensagem. Ninguém sabe o que ela diz.</p>
-        <p>O projeto é gratuito, sem anúncio, sem conta obrigatória. Roda no seu servidor de estimação e custa o que custa.</p>
-        <p>Feito por Vinícius Gabriel. Se quiser ajudar a manter de pé, a chave PIX está no rodapé. Se quiser reclamar de um bug, o e-mail também.</p>
+        <p>O UniWorld nasce aos poucos, com pedacinhos trazidos por pessoas que talvez nunca tenham se encontrado. Cada parte encontra seu lugar no mapa e passa a fazer parte de algo maior.</p>
+        <p>Você pode visitar os mundos, conhecer seus cidadãos e procurar as pistas espalhadas pelo caminho. Se quiser, também pode deixar sua própria parte e receber quem chegar com uma mensagem de boas-vindas.</p>
+        <p>Quando as duas mil partes estiverem reunidas, uma mensagem será revelada no centro do mapa. Até lá, há um mundo inteiro para descobrir, junto com quem vier depois de você.</p>
+        <p>O UniWorld é gratuito, sem anúncios e sem conta obrigatória. Foi criado por Vinícius Gabriel. Se quiser apoiar o projeto, a chave PIX está no rodapé; se precisar de ajuda ou quiser contar algo, escreva para <a href="mailto:miatsupport@gmail.com">miatsupport@gmail.com</a>.</p>
       </div>
-      <div class="actions"><a class="btn" href="#/">ver o mapa</a><a class="btn" href="#/regras">regras de conduta</a><a class="btn" href="PLANO.md">plano de construção</a></div>
+      <div class="actions"><a class="btn" href="#/">explorar o mapa</a><a class="btn" href="#/regras">como participar</a></div>
     </section>`);
 }
 
 async function viewRules() {
   const rules = [
-    ["uma peça por perfil (não por aparelho)", "a identificação usa dados controlados pelo navegador e pode ser apagada ou forjada. Sem autenticação externa e verificação, não há como garantir uma peça por aparelho."],
-    ["a posição não se escolhe", "o servidor sorteia entre as vazias."],
-    ["o texto é seu, o mundo não", "boas-vindas até 200 caracteres, pistas até 120, placas até 90. nada de link."],
-    ["o nome muda uma vez", "depois de trocado, fica selado para sempre."],
-    ["os códigos são reais", "cada parte tem um código verdadeiro e dois falsos."],
-    ["as bordas são reservadas", "os quatro totens abrem quando restarem quarenta posições vazias."],
+    ["uma parte para cada pessoa", "A ideia é que cada pessoa deixe uma parte e ajude o mundo a crescer junto com as outras."],
+    ["cada parte encontra seu lugar", "A posição é sorteada entre os espaços disponíveis. Sua vizinhança será uma surpresa."],
+    ["deixe suas palavras", "Escreva boas-vindas de até 200 caracteres, pistas de até 120 e placas de até 90. Escolha palavras que acolham quem visitar seu mundo e não coloque links nesses textos."],
+    ["escolha o nome com carinho", "Você pode mudar o nome do seu mundo uma única vez. Depois disso, ele permanece como você escolheu."],
+    ["guarde seu código", "Cada parte recebe um código verdadeiro e dois falsos. O verdadeiro aparece só uma vez; guarde-o para o mistério das bordas."],
+    ["as bordas ficam para depois", "Os espaços das bordas ficam reservados até restarem 40 lugares vazios no mapa."],
+    ["cuide do seu acesso", "Seu acesso fica neste navegador. Se você apagar os dados dele ou trocar de aparelho, pode perdê-lo, e a recuperação não é automática."],
   ];
   app.innerHTML = layout(`
     <section style="padding:48px 0 24px;max-width:680px">
       <p class="kicker">regras</p>
-      <h1 style="font-size:2.2rem">conduta</h1>
+      <h1 style="font-size:2.2rem">alguns combinados</h1>
+      <p class="lede">Para que todo mundo se sinta bem por aqui, reunimos o que é importante saber antes de participar.</p>
       <ol class="prose" style="list-style:none">
         ${rules.map(([t, d]) => `<li><b style="font-weight:400">${t}</b><br /><span class="note">${d}</span></li>`).join("")}
       </ol>
@@ -826,7 +825,7 @@ async function router() {
   const [route, a, b] = parts;
   try {
     if (STATIC_PREVIEW && ["entregar", "editar", "mundo", "parte", "estado"].includes(route)) {
-      app.innerHTML = layout(`<section style="padding:48px 0"><p class="kicker">prévia estática</p><h1 style="font-size:1.9rem">esta função precisa do servidor</h1><p class="hint">O GitHub Pages não executa a API Node do UniWorld. A publicação atual mostra o mapa como prévia; contribuições e dados compartilhados precisam de um servidor separado.</p><div class="actions"><a class="btn" href="#/">voltar ao mapa</a></div></section>`);
+      app.innerHTML = layout(`<section style="padding:48px 0"><p class="kicker">prévia do UniWorld</p><h1 style="font-size:1.9rem">vamos para o mundo completo?</h1><p class="hint">Esta é uma prévia. Para visitar mundos, acompanhar o mapa e participar, acesse a <a href="https://uniworld-s753.onrender.com/">versão completa do UniWorld</a>.</p><div class="actions"><a class="btn" href="#/">voltar ao mapa</a></div></section>`);
       return;
     }
     if (!route) return await viewMap();
@@ -842,7 +841,7 @@ async function router() {
     app.innerHTML = layout(`<section style="padding:48px 0">
       <p class="kicker">erro</p>
       <h1 style="font-size:1.9rem">${esc(err.message)}</h1>
-      <p class="hint">confira se o servidor está no ar: node server.mjs</p>
+      <p class="hint">Não conseguimos abrir esta parte agora. Tente novamente em instantes; se o problema continuar, fale com a gente em <a href="mailto:miatsupport@gmail.com">miatsupport@gmail.com</a>.</p>
       <div class="actions"><a class="btn" href="#/">voltar ao mapa</a></div>
     </section>`);
   }
