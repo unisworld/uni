@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>404 — documento #404: o chão acabou</title>
+<meta name="theme-color" content="#000">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@300;400;600&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{color-scheme:dark;--blood:#b82513;--pale:#ffd1c7;--bone:#e8e0cf;--hair:#1a1a1a}
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#000;color:#444;font-family:"EB Garamond",Georgia,serif;
+    -webkit-font-smoothing:antialiased;overscroll-behavior:none}
+  #plate{position:fixed;inset:0}
+  #plate img,#plate svg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+    filter:invert(1) grayscale(1) sepia(.5) contrast(1.18) brightness(.5)}
+  .tint{position:absolute;inset:0;background:linear-gradient(160deg,rgba(110,26,16,.34),rgba(0,0,0,.16) 46%,rgba(20,6,4,.52));mix-blend-mode:multiply}
+  .burn{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,0) 22%,rgba(0,0,0,.62) 62%,#000 100%)}
+  .scratches{position:absolute;inset:0;opacity:.3;mix-blend-mode:screen;
+    background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 1px,transparent 1px 4px),
+      repeating-linear-gradient(0deg,rgba(255,255,255,.03) 0 1px,transparent 1px 3px)}
+  #grain{position:fixed;inset:0;z-index:30;opacity:.17;mix-blend-mode:screen;pointer-events:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+  #frame{position:fixed;inset:11px;z-index:25;border:1px solid var(--hair);pointer-events:none}
+  .doc{position:fixed;z-index:26;top:26px;left:30px;font-size:.72rem;letter-spacing:.3em;text-transform:uppercase;color:#444}
+  .doc b{font-weight:500;color:#8a8580}
+  .label{position:fixed;z-index:26;left:50%;bottom:64px;transform:translateX(-50%);width:min(90vw,640px);
+    text-align:center;font-family:"Grenze Gotisch",serif;font-weight:300;font-size:clamp(.85rem,1.9vh,1.05rem);
+    letter-spacing:.1em;line-height:1.35;color:var(--pale);opacity:.72}
+  .msg{position:fixed;z-index:26;bottom:24px;left:0;width:100%;text-align:center;transform:rotate(180deg);
+    font-family:"Grenze Gotisch",serif;font-size:clamp(.9rem,2.1vh,1.15rem);letter-spacing:.14em;color:var(--blood);opacity:.9}
+  #content{position:fixed;z-index:35;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;padding:2rem 1.4rem}
+  h1{font-family:"Grenze Gotisch",serif;font-weight:600;font-size:clamp(4.5rem,19vw,10.5rem);line-height:.82;color:var(--bone);
+    text-shadow:0 0 90px rgba(184,37,19,.5),0 0 24px rgba(184,37,19,.32),0 2px 40px #000}
+  h1 em{font-style:normal;color:var(--blood)}
+  .kicker{margin-top:1.1rem;font-size:.66rem;letter-spacing:.44em;text-transform:uppercase;color:var(--blood);opacity:.9}
+  p{max-width:44ch;margin-top:1.15rem;font-size:.95rem;line-height:1.7;color:#726c65;text-shadow:0 2px 20px #000}
+  p strong{font-weight:500;color:#a8a19a}
+  nav{margin-top:2.1rem;display:flex;gap:1.7rem;flex-wrap:wrap;justify-content:center}
+  a{font-size:.64rem;letter-spacing:.32em;text-transform:uppercase;color:var(--pale);text-decoration:none;
+    padding-bottom:.42rem;border-bottom:1px solid #6e1a10;transition:color .3s,border-color .3s}
+  a:hover{color:#fff;border-color:var(--blood)}
+  small{margin-top:2.4rem;font-size:.56rem;letter-spacing:.26em;text-transform:uppercase;color:#3b3936}
+</style>
+</head>
+<body>
+<div id="plate">
+  <img src="./assets/gravura.png" alt="" id="pimg">
+  <svg viewBox="0 0 1200 675" preserveAspectRatio="xMidYMid slice" id="psvg" style="display:none">
+    <rect width="1200" height="675" fill="#e9dfc9"/>
+    <g fill="none" stroke="#12100e" stroke-width="13">
+      <circle cx="300" cy="337" r="118"/><ellipse cx="300" cy="337" rx="50" ry="118"/>
+      <ellipse cx="300" cy="337" rx="118" ry="44"/>
+    </g>
+    <g stroke="#12100e" stroke-width="11" fill="none"><path d="M240 270h120M240 404h120M234 337h132"/></g>
+    <rect x="267" y="304" width="66" height="66" fill="#12100e"/>
+    <text x="462" y="404" font-family="Poppins,sans-serif" font-weight="800" font-size="152" letter-spacing="-5" fill="#12100e">uniworld</text>
+  </svg>
+  <div class="tint"></div><div class="burn"></div><div class="scratches"></div>
+</div>
+<div id="grain"></div>
+<div id="frame"></div>
+<div class="doc">documento <b>#404</b></div>
+<div class="label">a travessia foi interrompida<br>o chão não existe mais aqui</div>
+<div class="msg">aquele pedaço do mundo foi destruído</div>
+<div id="content">
+  <h1>40<em>4</em></h1>
+  <div class="kicker">página não encontrada</div>
+  <p>Você chegou a um <strong>pedaço arrancado</strong> do mundo. Alguém atravessou daqui e não deixou chão atrás.</p>
+  <nav>
+    <a href="/">voltar ao mundo</a>
+    <a href="#/sobre">o que é isto</a>
+  </nav>
+  <small>uniworld · documento #404 · terra arrasada</small>
+</div>
+<script>
+  const i = document.getElementById('pimg'), s = document.getElementById('psvg');
+  i.addEventListener('error', () => { i.style.display = 'none'; s.style.display = 'block'; });
+</script>
+</body>
+</html>
