@@ -394,6 +394,7 @@ async function serveStatic(res, pathname) {
   if (rel !== "index.html" && !rel.startsWith("assets/") && rel !== "PLANO.md") return send(res, 404, { error: "não encontrado." });
   const target = normalize(join(ROOT, rel));
   if (!target.startsWith(ROOT.endsWith(sep) ? ROOT : ROOT + sep)) return send(res, 403, { error: "fora do diretório." });
+  if (rel.startsWith("assets/") && !target.startsWith(join(ROOT, "assets") + sep)) return send(res, 403, { error: "fora do diretório de assets." });
   try {
     const file = await readFile(target);
     res.writeHead(200, { "content-type": MIME[extname(target)] || "application/octet-stream" });
