@@ -100,14 +100,54 @@ test("issues an HttpOnly capability cookie; legacy fingerprint alone cannot acce
   assert.equal(publicWorld.part.clues[0], null);
   assert.equal(JSON.stringify(publicWorld).includes("private-test-clue"), false);
 
-  const forgedProgress = await jsonRequest("POST", "/api/clue", {
-    ownerId: "test-owner-123", cx: result.part.cx, cy: result.part.cy, idx: 0, x: 0, z: 0,
-  });
-  assert.equal(forgedProgress.status, 403);
-  const forgedClueRead = await request("GET", "/api/clues?owner=test-owner-123");
-  assert.equal(forgedClueRead.status, 403);
-
   const point = publicWorld.local.cluePoints[0];
+  // A visitor without a claimed world gets an independent, clue-only session.
+  // The legacy owner query is ignored; progress is keyed only to the cookie.
+  const visitorInit = await request("GET", "/api/clues?owner=test-owner-123");
+  assert.equal(visitorInit.status, 200);
+  assert.deepEqual(visitorInit.json().clues, []);
+  const visitorSetCookie = visitorInit.headers["set-cookie"];
+  assert.match(visitorSetCookie, /^uniworld_visitor=[A-Za-z0-9_-]{43};.*HttpOnly/);
+  assert.match(visitorSetCookie, /SameSite=Strict/);
+  const visitorCookie = visitorSetCookie.split(";", 1)[0];
+  const visitorBefore = (await request("GET", worldUrl, null, { cookie: visitorCookie })).json();
+  assert.equal(visitorBefore.part.clues[0], null);
+
+  const visitorCollect = await jsonRequest("POST", "/api/clue", {
+    ownerId: "test-owner-123", cx: result.part.cx, cy: result.part.cy, idx: 0, x: point.x, z: point.z,
+  }, { cookie: visitorCookie });
+  assert.equal(visitorCollect.status, 200);
+  assert.equal(visitorCollect.json().clue, "private-test-clue");
+  const visitorProgress = (await request("GET", "/api/clues?owner=attacker-controlled", null, { cookie: visitorCookie })).json();
+  assert.deepEqual(visitorProgress.clues, [{ cx: result.part.cx, cy: result.part.cy, idx: 0 }]);
+  const visitorRevealed = (await request("GET", worldUrl, null, { cookie: visitorCookie })).json();
+  assert.equal(visitorRevealed.part.clues[0], "private-test-clue");
+
+  // No world-management rights are granted by the visitor cookie.
+  assert.equal((await request("GET", "/api/mine", null, { cookie: visitorCookie })).json(), null);
+  const visitorEdit = await jsonRequest("POST", "/api/mine", { name: "Hijacked" }, { cookie: visitorCookie });
+  assert.equal(visitorEdit.status, 404);
+  const visitorSign = await jsonRequest("POST", "/api/sign", { text: "Hijacked" }, { cookie: visitorCookie });
+  assert.equal(visitorSign.status, 404);
+
+  // A separate visitor cannot see the first visitor's clue, despite a forged owner query.
+  const secondVisitor = await request("GET", "/api/clues?owner=test-owner-123");
+  assert.equal(secondVisitor.status, 200);
+  assert.deepEqual(secondVisitor.json().clues, []);
+  assert.notEqual(secondVisitor.headers["set-cookie"].split(";", 1)[0], visitorCookie);
+
+  // The POST also bootstraps a fresh clue-only session when reached directly.
+  const directVisitorCollect = await jsonRequest("POST", "/api/clue", {
+    ownerId: "test-owner-123", cx: result.part.cx, cy: result.part.cy, idx: 1,
+    x: publicWorld.local.cluePoints[1].x, z: publicWorld.local.cluePoints[1].z,
+  });
+  assert.equal(directVisitorCollect.status, 200);
+  const directVisitorCookie = directVisitorCollect.headers["set-cookie"].split(";", 1)[0];
+  assert.match(directVisitorCookie, /^uniworld_visitor=[A-Za-z0-9_-]{43}$/);
+  const directProgress = (await request("GET", "/api/clues?owner=attacker-controlled", null, { cookie: directVisitorCookie })).json();
+  assert.deepEqual(directProgress.clues, [{ cx: result.part.cx, cy: result.part.cy, idx: 1 }]);
+  assert.equal((await request("GET", worldUrl, null, { cookie: directVisitorCookie })).json().part.clues[1], directVisitorCollect.json().clue);
+
   const collect = await jsonRequest("POST", "/api/clue", {
     ownerId: "attacker-controlled", cx: result.part.cx, cy: result.part.cy, idx: 0, x: point.x, z: point.z,
   }, { cookie });
