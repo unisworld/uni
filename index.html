@@ -1,31 +1,57 @@
 <!doctype html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>uniworld — um mundo em duas mil partes</title>
-    <meta
-      name="description"
-      content="Um mundo feito em pedaços por gente que nunca se falou. Cada pessoa entrega uma parte; o sistema decide onde ela cabe."
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@300;400;500&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="./assets/styles.css" />
-    <script type="importmap">
-      { "imports": { "three": "https://esm.sh/three@0.171.0" } }
-    </script>
-  </head>
-  <body>
-    <div id="app"></div>
-    <noscript>
-      <p style="padding: 24px; font-family: monospace; color: #e6e2da; background: #0b0e12">
-        uniworld precisa de JavaScript. O mapa tem 2000 posições; sem script, ele não abre.
-      </p>
-    </noscript>
-    <script type="module" src="./assets/app.js"></script>
-  </body>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>uniworld — um mundo em duas mil partes</title>
+<meta name="description" content="Um mundo feito em pedaços por gente que nunca se falou. Cada pessoa entrega uma parte; o sistema decide onde ela cabe.">
+<meta name="theme-color" content="#08120f">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./assets/styles.css">
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.module.js"}}
+</script>
+</head>
+<body>
+<div id="stage"><canvas id="c" tabindex="0" aria-label="mundo navegável"></canvas></div>
+
+<header id="bar">
+  <a href="#/" id="brand">uniworld</a>
+  <div id="count"><b id="occ">0</b><span>/</span><span id="tot">2000</span></div>
+  <nav id="barLinks">
+    <a href="#/entregar">entregar</a>
+    <a href="#/estado">estado</a>
+    <a href="#/sobre">sobre</a>
+  </nav>
+</header>
+
+<main id="panel" aria-live="polite"></main>
+
+<div id="hud">
+  <div id="compass"><div id="track"><div id="needle"></div></div></div>
+  <div id="prompt"></div>
+</div>
+
+<div id="joy"><div id="joyKnob"></div></div>
+
+<div id="toast"></div>
+
+<div id="veil">
+  <div id="veilInner">
+    <h1>uniworld</h1>
+    <p>um mundo em duas mil partes</p>
+    <div id="veilBar"></div>
+  </div>
+</div>
+
+<noscript>
+  <p style="padding:24px;font-family:monospace;color:#f7f1e4;background:#08120f">
+    uniworld precisa de JavaScript. O mapa tem 2000 posições; sem script, ele não abre.
+  </p>
+</noscript>
+
+<script type="module" src="./assets/app.js"></script>
+</body>
 </html>
