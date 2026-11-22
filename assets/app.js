@@ -11,6 +11,7 @@ const STATIC_PREVIEW = location.hostname.endsWith(".github.io");
 const PIX_KEY = "ab3a2cd5-6283-4fab-9676-905ccd7d8d0c";
 let realm = null;
 let ambience = null;
+let routeEpoch = 0;
 
 const owner = (() => {
   const key = "uniworld:owner";
@@ -385,9 +386,10 @@ async function viewEdit() {
 
 /* ---------------- mundo ---------------- */
 
-async function viewWorld(cx, cy) {
+async function viewWorld(cx, cy, routeToken) {
   const data = await api(`/api/part/${cx}/${cy}`);
   const clues = await api(`/api/clues?owner=${encodeURIComponent(owner)}`).catch(() => ({ clues: [] }));
+  if (routeToken !== routeEpoch) return;
   const got = new Set(clues.clues.filter((c) => c.cx === cx && c.cy === cy).map((c) => c.idx));
   const part = data.part;
 
@@ -402,7 +404,7 @@ async function viewWorld(cx, cy) {
         <div class="hud-top">
           <span class="chip" id="mode">órbita · pistas ${got.size}/3</span>
           <div class="hud-btns">
-            <button class="btn" id="sound" type="button">som</button>
+            <button class="btn" id="sound" type="button" aria-pressed="false" aria-label="Ativar som do mundo">som: ativando…</button>
             <button class="btn" id="recenter" type="button">recentrar</button>
             <button class="btn" id="cam" type="button">câmera</button>
           </div>
@@ -475,11 +477,41 @@ async function viewWorld(cx, cy) {
     onClue: (idx, x, z) => collect(idx, x, z),
   });
 
-  document.getElementById("sound").addEventListener("click", async () => {
-    if (!ambience) ambience = createAmbience(part.biome, part.climate);
-    const on = await ambience.toggle();
-    document.getElementById("sound").classList.toggle("solid", !!on);
+  const soundButton = document.getElementById("sound");
+  function updateSoundButton() {
+    if (!soundButton || !ambience) return;
+    const state = ambience.getState();
+    const on = state === "on";
+    soundButton.classList.toggle("solid", on);
+    soundButton.setAttribute("aria-pressed", String(on));
+    soundButton.disabled = state === "starting" || state === "unavailable";
+    if (state === "starting") {
+      soundButton.textContent = "som: iniciando";
+      soundButton.setAttribute("aria-label", "Ativando som do mundo");
+    } else if (state === "blocked") {
+      soundButton.textContent = "som: toque";
+      soundButton.setAttribute("aria-label", "Som bloqueado; toque no botão ou interaja com o mundo para ativar");
+    } else if (state === "unavailable") {
+      soundButton.textContent = "sem áudio";
+      soundButton.setAttribute("aria-label", "Áudio indisponível neste navegador");
+    } else if (on) {
+      soundButton.textContent = "som: ligado";
+      soundButton.setAttribute("aria-label", "Desativar som do mundo");
+    } else {
+      soundButton.textContent = "som: desligado";
+      soundButton.setAttribute("aria-label", "Ativar som do mundo");
+    }
+  }
+  ambience = createAmbience(part.biome, part.climate);
+  soundButton.addEventListener("click", async () => {
+    soundButton.disabled = true;
+    await ambience.toggle();
+    updateSoundButton();
   });
+  // Match Neocities: attempt to begin on entering a world; if the browser
+  // blocks autoplay, the ambience module waits for the first real user gesture.
+  ambience.onState(updateSoundButton);
+  ambience.start();
 
   async function collect(idx, x, z) {
     try {
@@ -641,6 +673,7 @@ async function viewRules() {
 /* ---------------- roteador ---------------- */
 
 async function router() {
+  const routeToken = ++routeEpoch;
   if (realm) {
     realm.dispose();
     realm = null;
@@ -659,7 +692,7 @@ async function router() {
     if (!route) return await viewMap();
     if (route === "entregar") return await viewClaim();
     if (route === "editar") return await viewEdit();
-    if (route === "mundo") return await viewWorld(Number(a), Number(b));
+    if (route === "mundo") return await viewWorld(Number(a), Number(b), routeToken);
     if (route === "parte") return await viewPart(a);
     if (route === "estado") return await viewState();
     if (route === "sobre") return await viewAbout();

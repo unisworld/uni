@@ -80,22 +80,24 @@ export function clipFor(behavior) {
 /* ---------------- esqueleto ---------------- */
 
 const BONES = [
-  { name: "root", parent: null, pivot: [0, 0.55, 0] },
-  { name: "torso", parent: "root", pivot: [0, 0.55, 0] },
-  { name: "head", parent: "torso", pivot: [0, 0.95, 0] },
-  { name: "armL", parent: "torso", pivot: [0.19, 0.92, 0] },
-  { name: "armR", parent: "torso", pivot: [-0.19, 0.92, 0] },
-  { name: "legL", parent: "root", pivot: [0.08, 0.55, 0] },
-  { name: "legR", parent: "root", pivot: [-0.08, 0.55, 0] },
+  { name: "root", parent: null, pivot: [0, 0, 0] },
+  { name: "torso", parent: "root", pivot: [0, 0.9, 0] },
+  { name: "head", parent: "torso", pivot: [0, 1.26, 0] },
+  { name: "armL", parent: "torso", pivot: [0.24, 1.1, 0] },
+  { name: "armR", parent: "torso", pivot: [-0.24, 1.1, 0] },
+  { name: "legL", parent: "root", pivot: [0.093, 0.6, 0] },
+  { name: "legR", parent: "root", pivot: [-0.093, 0.6, 0] },
 ];
 
+// Rounded, smoothly shaded pieces based on UniWorld's Neocities citizens.
+// The geometry is merged without discarding its triangle indices.
 const PARTS = [
-  { bone: "torso", center: [0, 0.78, 0], size: [0.3, 0.46, 0.2] },
-  { bone: "head", center: [0, 1.12, 0], size: [0.22, 0.22, 0.21] },
-  { bone: "armL", center: [0.19, 0.74, 0], size: [0.09, 0.38, 0.1] },
-  { bone: "armR", center: [-0.19, 0.74, 0], size: [0.09, 0.38, 0.1] },
-  { bone: "legL", center: [0.08, 0.28, 0], size: [0.11, 0.56, 0.12] },
-  { bone: "legR", center: [-0.08, 0.28, 0], size: [0.11, 0.56, 0.12] },
+  { bone: "torso", type: "capsule", args: [0.19, 0.42, 3, 8], center: [0, 0.9, 0] },
+  { bone: "head", type: "sphere", args: [0.24, 14, 10], center: [0, 1.38, 0] },
+  { bone: "armL", type: "capsule", args: [0.052, 0.32, 2, 6], center: [0.24, 0.909, 0] },
+  { bone: "armR", type: "capsule", args: [0.052, 0.32, 2, 6], center: [-0.24, 0.909, 0] },
+  { bone: "legL", type: "capsule", args: [0.064, 0.32, 2, 6], center: [0.093, 0.362, 0] },
+  { bone: "legR", type: "capsule", args: [0.064, 0.32, 2, 6], center: [-0.093, 0.362, 0] },
 ];
 
 /* ---------------- poses ---------------- */
@@ -314,53 +316,82 @@ function boneMatrices(pose) {
 /* ---------------- cozimento ---------------- */
 
 function buildRig() {
-  const verts = [];
+  const positions = [];
+  const normals = [];
   const boneOf = [];
-  PARTS.forEach((part) => {
-    const g = new THREE.BoxGeometry(part.size[0], part.size[1], part.size[2]).toNonIndexed();
-    g.translate(part.center[0], part.center[1], part.center[2]);
-    const a = g.attributes.position.array;
-    for (let i = 0; i < a.length; i += 3) {
-      verts.push(a[i], a[i + 1], a[i + 2]);
+  const indices = [];
+
+  for (const part of PARTS) {
+    const g = part.type === "sphere"
+      ? new THREE.SphereGeometry(...part.args)
+      : new THREE.CapsuleGeometry(...part.args);
+    g.translate(...part.center);
+    const pos = g.attributes.position;
+    const nor = g.attributes.normal;
+    const base = positions.length / 3;
+    for (let i = 0; i < pos.count; i++) {
+      positions.push(pos.getX(i), pos.getY(i), pos.getZ(i));
+      normals.push(nor.getX(i), nor.getY(i), nor.getZ(i));
       boneOf.push(part.bone);
     }
+    const idx = g.index;
+    if (!idx) throw new Error(`Expected indexed ${part.type} geometry`);
+    for (let i = 0; i < idx.count; i++) indices.push(base + idx.getX(i));
     g.dispose();
-  });
-  return { verts, boneOf };
+  }
+  return {
+    verts: new Float32Array(positions),
+    normals: new Float32Array(normals),
+    boneOf,
+    indices: new Uint16Array(indices),
+  };
 }
 
 let baked = null;
 
 function bake() {
   if (baked) return baked;
-  const { verts, boneOf } = buildRig();
+  const { verts, normals, boneOf, indices } = buildRig();
   const V = verts.length / 3;
   const rows = CLIP_NAMES.length * FRAMES;
+  // Keep both axes comfortably below common mobile WebGL texture limits.
+  if (V > 2048 || rows > 2048) {
+    throw new Error(`VAT texture ${V}x${rows} exceeds the supported 2048px budget`);
+  }
   const data = new Float32Array(V * rows * 4);
+  const normalData = new Float32Array(V * rows * 4);
   const v = new THREE.Vector3();
-
+  const n = new THREE.Vector3();
   for (let ci = 0; ci < CLIP_NAMES.length; ci++) {
     for (let f = 0; f < FRAMES; f++) {
       const mats = boneMatrices(poseFor(CLIP_NAMES[ci], f / FRAMES));
+      const normalMats = {};
+      for (const bone of BONES) normalMats[bone.name] = new THREE.Matrix3().getNormalMatrix(mats[bone.name]);
       const row = ci * FRAMES + f;
       for (let i = 0; i < V; i++) {
-        v.set(verts[i * 3], verts[i * 3 + 1], verts[i * 3 + 2]).applyMatrix4(mats[boneOf[i]]);
+        const bone = boneOf[i];
+        v.set(verts[i * 3], verts[i * 3 + 1], verts[i * 3 + 2]).applyMatrix4(mats[bone]);
+        n.set(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]);
+        n.applyMatrix3(normalMats[bone]).normalize();
         const o = (row * V + i) * 4;
-        data[o] = v.x;
-        data[o + 1] = v.y;
-        data[o + 2] = v.z;
-        data[o + 3] = 1;
+        data[o] = v.x; data[o + 1] = v.y; data[o + 2] = v.z; data[o + 3] = 1;
+        normalData[o] = n.x; normalData[o + 1] = n.y; normalData[o + 2] = n.z; normalData[o + 3] = 1;
       }
     }
   }
 
   const texture = new THREE.DataTexture(data, V, rows, THREE.RGBAFormat, THREE.FloatType);
-  texture.minFilter = THREE.NearestFilter;
-  texture.magFilter = THREE.NearestFilter;
-  texture.generateMipmaps = false;
-  texture.needsUpdate = true;
+  const normalTexture = new THREE.DataTexture(normalData, V, rows, THREE.RGBAFormat, THREE.FloatType);
+  for (const tex of [texture, normalTexture]) {
+    tex.minFilter = THREE.NearestFilter;
+    tex.magFilter = THREE.NearestFilter;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.generateMipmaps = false;
+    tex.needsUpdate = true;
+  }
 
-  baked = { verts: new Float32Array(verts), V, rows, texture };
+  baked = { verts, normals, indices, V, rows, texture, normalTexture };
   return baked;
 }
 
@@ -379,36 +410,43 @@ attribute float aInstRate;
 attribute vec3 aInstColor;
 
 uniform sampler2D uAnim;
+uniform sampler2D uAnimNormal;
 uniform vec2 uAnimSize;
 uniform float uFrames;
 uniform float uTime;
 uniform float uMotion;
 
 varying vec3 vColor;
-varying vec3 vView;
+varying vec3 vNormal;
 varying float vHeight;
 varying float vDepth;
 
+vec4 readVAT(sampler2D tex, float row, float vid) {
+  return texture2D(tex, vec2((vid + 0.5) / uAnimSize.x, (row + 0.5) / uAnimSize.y));
+}
+
 void main() {
-  float phase = aInstPhase + uTime * aInstRate * uMotion;
-  float frame = mod(floor(phase * uFrames), uFrames);
-  float row = aInstClip * uFrames + frame;
+  float phase = fract(aInstPhase + uTime * aInstRate * uMotion);
+  float framePos = phase * uFrames;
+  float frame0 = floor(framePos);
+  float frame1 = mod(frame0 + 1.0, uFrames);
+  float blend = fract(framePos);
+  float row0 = aInstClip * uFrames + frame0;
+  float row1 = aInstClip * uFrames + frame1;
 
-  vec2 uv = vec2((aVid + 0.5) / uAnimSize.x, (row + 0.5) / uAnimSize.y);
-  vec3 p = texture2D(uAnim, uv).xyz;
-
+  vec3 p = mix(readVAT(uAnim, row0, aVid).xyz, readVAT(uAnim, row1, aVid).xyz, blend);
+  vec3 n = normalize(mix(readVAT(uAnimNormal, row0, aVid).xyz, readVAT(uAnimNormal, row1, aVid).xyz, blend));
   float cs = cos(aInstYaw);
   float sn = sin(aInstYaw);
   vec3 rp = vec3(p.x * cs + p.z * sn, p.y, -p.x * sn + p.z * cs) * aInstScale;
+  vec3 rn = vec3(n.x * cs + n.z * sn, n.y, -n.x * sn + n.z * cs);
 
   vec4 world = modelMatrix * vec4(rp + aInstPos, 1.0);
   vec4 mv = viewMatrix * world;
-
   vColor = aInstColor;
-  vView = mv.xyz;
-  vHeight = clamp(p.y, 0.0, 1.4);
+  vNormal = normalize(normalMatrix * rn);
+  vHeight = clamp(p.y, 0.0, 1.6);
   vDepth = -mv.z;
-
   gl_Position = projectionMatrix * mv;
 }
 `;
@@ -421,20 +459,18 @@ uniform float uFogNear;
 uniform float uFogFar;
 
 varying vec3 vColor;
-varying vec3 vView;
+varying vec3 vNormal;
 varying float vHeight;
 varying float vDepth;
 
 void main() {
-  vec3 n = normalize(cross(dFdx(vView), dFdy(vView)));
+  vec3 n = normalize(vNormal);
   vec3 lightDir = normalize(vec3(0.42, 0.86, 0.3));
   float lam = max(dot(n, lightDir), 0.0);
-  float amb = 0.42 + 0.3 * clamp(vHeight / 1.2, 0.0, 1.0);
-  vec3 col = vColor * (amb + lam * 0.72);
-
+  float ambient = 0.48 + 0.18 * clamp(vHeight / 1.2, 0.0, 1.0);
+  vec3 col = vColor * (ambient + lam * 0.62);
   float fog = smoothstep(uFogNear, uFogFar, vDepth);
   col = mix(col, uFogColor, fog);
-
   gl_FragColor = vec4(col, 1.0);
 }
 `;
@@ -442,11 +478,12 @@ void main() {
 /* ---------------- sistema de multidão ---------------- */
 
 export function createCrowdSystem(count) {
-  const { verts, V, rows, texture } = bake();
+  const { verts, indices, V, rows, texture, normalTexture } = bake();
   const n = Math.max(1, count);
 
   const geometry = new THREE.InstancedBufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(verts, 3));
+  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
 
   const vids = new Float32Array(V);
   for (let i = 0; i < V; i++) vids[i] = i;
@@ -481,6 +518,7 @@ export function createCrowdSystem(count) {
   const material = new THREE.ShaderMaterial({
     uniforms: {
       uAnim: { value: texture },
+      uAnimNormal: { value: normalTexture },
       uAnimSize: { value: new THREE.Vector2(V, rows) },
       uFrames: { value: FRAMES },
       uTime: { value: 0 },
