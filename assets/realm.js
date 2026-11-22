@@ -47,6 +47,7 @@ const STONE_COUNT = { oceano: 6, costa: 55, campina: 24, mata: 34, serra: 90 };
 export function createRealm(container, opts = {}) {
   const piece = opts.piece;
   const reduced = !!opts.reducedMotion;
+  const lowPower = window.matchMedia?.("(hover: none)").matches && (navigator.hardwareConcurrency || 4) <= 4;
   const onNear = opts.onNear || (() => {});
   const onNearClue = opts.onNearClue || (() => {});
   const onClue = opts.onClue || (() => {});
@@ -84,7 +85,8 @@ export function createRealm(container, opts = {}) {
     return null;
   }
 
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const pixelRatioCap = lowPower ? 1.5 : 2;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, pixelRatioCap));
   renderer.domElement.style.cssText = "display:block;width:100%;height:100%;touch-action:none;";
   container.appendChild(renderer.domElement);
 
@@ -105,7 +107,7 @@ export function createRealm(container, opts = {}) {
 
   /* ---------- terreno ---------- */
 
-  const SEG = reduced ? 64 : 96;
+  const SEG = reduced || lowPower ? 64 : 96;
   const terrainGeo = new THREE.PlaneGeometry(24, 24, SEG, SEG);
   terrainGeo.rotateX(-Math.PI / 2);
   const posAttr = terrainGeo.attributes.position;
@@ -141,9 +143,22 @@ export function createRealm(container, opts = {}) {
 
   /* ---------- água ---------- */
 
+  const WATER_COLOR = {
+    oceano: 0x356d7a,
+    costa: 0x4b8586,
+    campina: 0x356e79,
+    mata: 0x285b62,
+    serra: 0x58727c,
+  };
   const water = new THREE.Mesh(
     new THREE.CircleGeometry(80, 48),
-    new THREE.MeshLambertMaterial({ color: 0x14303f, transparent: true, opacity: 0.94 }),
+    new THREE.MeshPhongMaterial({
+      color: WATER_COLOR[piece.biome] || WATER_COLOR.campina,
+      specular: 0x9db8bc,
+      shininess: 42,
+      transparent: true,
+      opacity: 0.94,
+    }),
   );
   water.rotation.x = -Math.PI / 2;
   water.position.y = -0.02;
@@ -203,7 +218,7 @@ export function createRealm(container, opts = {}) {
     return { x: Math.cos(a) * maxR, z: Math.sin(a) * maxR, a };
   };
 
-  const trees = TREE_COUNT[piece.biome] ?? 4;
+  const trees = Math.ceil((TREE_COUNT[piece.biome] ?? 4) * (lowPower ? 0.8 : 1));
   if (trees > 0) {
     const trunk = new THREE.InstancedMesh(
       new THREE.CylinderGeometry(0.07, 0.11, 1.1, 5),
@@ -240,7 +255,7 @@ export function createRealm(container, opts = {}) {
     world.add(trunk, canopy);
   }
 
-  const tufts = TUFT_COUNT[piece.biome] ?? 40;
+  const tufts = Math.floor((TUFT_COUNT[piece.biome] ?? 40) * (lowPower ? 0.72 : 1));
   if (tufts > 0) {
     const grass = new THREE.InstancedMesh(
       new THREE.ConeGeometry(0.055, 0.34, 4),
@@ -264,7 +279,7 @@ export function createRealm(container, opts = {}) {
     world.add(grass);
   }
 
-  const stones = STONE_COUNT[piece.biome] ?? 20;
+  const stones = Math.floor((STONE_COUNT[piece.biome] ?? 20) * (lowPower ? 0.8 : 1));
   if (stones > 0) {
     const rock = new THREE.InstancedMesh(
       new THREE.TetrahedronGeometry(0.17, 0),
@@ -288,27 +303,89 @@ export function createRealm(container, opts = {}) {
     world.add(rock);
   }
 
+  /* ---------- flora baixa ---------- */
+
+  const flowerBase = { oceano: 0, costa: 16, campina: 46, mata: 34, serra: 12 }[piece.biome] ?? 20;
+  const flowerCount = Math.floor(flowerBase * (lowPower ? 0.65 : reduced ? 0.78 : 1));
+  if (flowerCount > 0) {
+    const stem = new THREE.InstancedMesh(
+      new THREE.CylinderGeometry(0.014, 0.022, 0.25, 4),
+      new THREE.MeshLambertMaterial({ color: 0x71804b }),
+      flowerCount,
+    );
+    const bloom = new THREE.InstancedMesh(
+      new THREE.IcosahedronGeometry(0.075, 0),
+      new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }),
+      flowerCount,
+    );
+    const flowerColors = {
+      costa: ["#f1dfb2", "#f5e8d0", "#d6c993"],
+      campina: ["#f3d58a", "#eee1c3", "#e4b8a8", "#d5dced"],
+      mata: ["#e9d7ae", "#d7d6be", "#d9b5c5", "#a9c1ae"],
+      serra: ["#e7dfcb", "#d7b8a6", "#c3d0d2"],
+    }[piece.biome] || ["#ead9b4"];
+    const tint = new THREE.Color();
+    const groups = Math.max(2, Math.min(6, Math.ceil(flowerCount / 9)));
+    const centers = Array.from({ length: groups }, () => freeSpot(3.4, 9.2));
+    for (let i = 0; i < flowerCount; i++) {
+      const center = centers[i % groups];
+      let x = center.x + (rnd() - 0.5) * 2.4;
+      let z = center.z + (rnd() - 0.5) * 2.4;
+      if (piece.nodes.some((n) => Math.hypot(n.x - x, n.z - z) < 1.1)) {
+        x = center.x;
+        z = center.z;
+      }
+      const y = h(x, z);
+      const scale = 0.72 + rnd() * 0.7;
+      dummy.position.set(x, y + 0.125 * scale, z);
+      dummy.rotation.set(0, rnd() * Math.PI * 2, (rnd() - 0.5) * 0.18);
+      dummy.scale.set(scale, scale, scale);
+      dummy.updateMatrix();
+      stem.setMatrixAt(i, dummy.matrix);
+      dummy.position.y = y + 0.27 * scale;
+      dummy.rotation.set(rnd() * 0.3, rnd() * Math.PI * 2, rnd() * 0.3);
+      dummy.scale.set(scale, scale * (0.82 + rnd() * 0.36), scale);
+      dummy.updateMatrix();
+      bloom.setMatrixAt(i, dummy.matrix);
+      tint.set(flowerColors[Math.floor(rnd() * flowerColors.length)]);
+      bloom.setColorAt(i, tint);
+    }
+    stem.instanceMatrix.needsUpdate = true;
+    bloom.instanceMatrix.needsUpdate = true;
+    if (bloom.instanceColor) bloom.instanceColor.needsUpdate = true;
+    world.add(stem, bloom);
+  }
+
   /* ---------- poeira ---------- */
 
-  const dustCount = reduced ? 40 : 140;
+  const dustCount = reduced ? 40 : lowPower ? 70 : 140;
   const dustGeo = new THREE.BufferGeometry();
   const dustPos = new Float32Array(dustCount * 3);
+  const dustColors = new Float32Array(dustCount * 3);
+  const moteBase = new THREE.Color(palette.sun);
+  const moteLight = new THREE.Color("#fff7e3");
   for (let i = 0; i < dustCount; i++) {
     const a = rnd() * Math.PI * 2;
     const r = rnd() * 10;
     dustPos[i * 3] = Math.cos(a) * r;
     dustPos[i * 3 + 1] = 0.3 + rnd() * 3.2;
     dustPos[i * 3 + 2] = Math.sin(a) * r;
+    const mote = moteBase.clone().lerp(moteLight, rnd() * 0.45);
+    dustColors[i * 3] = mote.r;
+    dustColors[i * 3 + 1] = mote.g;
+    dustColors[i * 3 + 2] = mote.b;
   }
   dustGeo.setAttribute("position", new THREE.BufferAttribute(dustPos, 3));
+  dustGeo.setAttribute("color", new THREE.BufferAttribute(dustColors, 3));
   const dustTex = dustTexture();
   const dust = new THREE.Points(
     dustGeo,
     new THREE.PointsMaterial({
       map: dustTex,
-      size: 0.12,
+      size: lowPower ? 0.1 : 0.13,
       transparent: true,
-      opacity: 0.45,
+      opacity: 0.42,
+      vertexColors: true,
       depthWrite: false,
       sizeAttenuation: true,
     }),
@@ -404,7 +481,7 @@ export function createRealm(container, opts = {}) {
 
   let weather = null;
   if (climate === "chuva" || climate === "neve") {
-    const flakes = reduced ? 140 : 520;
+    const flakes = reduced ? 140 : lowPower ? 280 : 520;
     const geo = new THREE.BufferGeometry();
     const points = new Float32Array(flakes * 3);
     const fall = new Float32Array(flakes);
@@ -827,11 +904,13 @@ export function createRealm(container, opts = {}) {
 
     for (let i = 0; i < clueMeshes.length; i++) {
       const m = clueMeshes[i];
-      m.rotation.y = t * 0.8 + i;
-      m.position.y = h(m.position.x, m.position.z) + 0.95 + Math.sin(t * 1.6 + i) * 0.12;
+      if (!reduced) {
+        m.rotation.y = t * 0.8 + i;
+        m.position.y = h(m.position.x, m.position.z) + 0.95 + Math.sin(t * 1.6 + i) * 0.12;
+      }
     }
 
-    water.position.y = -0.02 + Math.sin(t * 0.6) * 0.015;
+    water.position.y = -0.02 + (reduced ? 0 : Math.sin(t * 0.6) * 0.015);
 
     if (weather && !reduced) {
       const attr = weather.geometry.attributes.position;
@@ -858,7 +937,7 @@ export function createRealm(container, opts = {}) {
     if (cameraMode) {
       camera.position.set(0, 0, 0);
       camera.rotation.set(orientPitch, orientYaw, 0, "YXZ");
-      reticle.material.opacity = 0.35 + Math.sin(t * 2) * 0.12;
+      reticle.material.opacity = reduced ? 0.42 : 0.35 + Math.sin(t * 2) * 0.12;
     } else {
       const cosP = Math.cos(pitch);
       camera.position.set(

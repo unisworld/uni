@@ -50,12 +50,44 @@ export function createSky(biome) {
       uniform vec3 uSun;
       uniform vec3 uSunDir;
       varying vec3 vDir;
+
+      float hash2(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+      }
+      float noise2(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash2(i), hash2(i + vec2(1.0, 0.0)), f.x),
+                   mix(hash2(i + vec2(0.0, 1.0)), hash2(i + vec2(1.0, 1.0)), f.x), f.y);
+      }
+      float cloudNoise(vec2 p) {
+        float value = 0.0;
+        float weight = 0.55;
+        for (int i = 0; i < 3; i++) {
+          value += noise2(p) * weight;
+          p *= 2.03;
+          weight *= 0.5;
+        }
+        return value / 0.9625;
+      }
+
       void main() {
         float h = clamp(vDir.y * 0.5 + 0.5, 0.0, 1.0);
         vec3 col = mix(uHorizon, uTop, pow(h, 0.8));
         float d = max(dot(normalize(vDir), normalize(uSunDir)), 0.0);
-        col += uSun * pow(d, 220.0) * 1.1;
-        col += uSun * pow(d, 7.0) * 0.09;
+        col += uSun * pow(d, 220.0) * 1.2;
+        col += uSun * pow(d, 7.0) * 0.11;
+        col += uSun * pow(d, 2.0) * 0.025;
+
+        // Soft, quiet cloud bands add depth without a post-processing pass.
+        vec2 cloudP = vec2(atan(vDir.z, vDir.x) * 2.4, vDir.y * 8.0);
+        cloudP += vec2(vDir.y * 3.0, vDir.x * 1.5);
+        float cloud = cloudNoise(cloudP);
+        float cloudMask = smoothstep(0.56, 0.79, cloud)
+          * smoothstep(0.47, 0.55, h) * (1.0 - smoothstep(0.82, 0.94, h));
+        vec3 cloudColor = mix(uHorizon * 1.12, vec3(0.82, 0.78, 0.69), 0.28 + d * 0.34);
+        col = mix(col, cloudColor, cloudMask * 0.18);
         col = mix(col, uHorizon * 1.12, pow(1.0 - h, 7.0) * 0.55);
         gl_FragColor = vec4(col, 1.0);
       }

@@ -125,7 +125,7 @@ export function createAmbience(biome, climate) {
       bp.Q.value = 6;
       const g = ctx.createGain();
       g.gain.setValueAtTime(0.0001, ctx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.09, ctx.currentTime + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.06, ctx.currentTime + 0.01);
       g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.22);
       src2.connect(bp).connect(g).connect(master);
       src2.start();
@@ -183,7 +183,7 @@ export function createAmbience(biome, climate) {
     osc.frequency.exponentialRampToValueAtTime(f * (1.2 + Math.random() * 0.5), t0 + length * 0.6);
     osc.frequency.exponentialRampToValueAtTime(f * 0.9, t0 + length);
     gain.gain.setValueAtTime(0.0001, t0);
-    gain.gain.exponentialRampToValueAtTime(0.05, t0 + length * 0.2);
+    gain.gain.exponentialRampToValueAtTime(0.04, t0 + length * 0.2);
     gain.gain.exponentialRampToValueAtTime(0.0001, t0 + length);
     osc.connect(gain).connect(master);
     osc.start();
@@ -269,7 +269,8 @@ export function createAmbience(biome, climate) {
     running = true;
     build();
     master.gain.cancelScheduledValues(ctx.currentTime);
-    master.gain.setTargetAtTime(0.9, ctx.currentTime, 1.2);
+    // A trilha fica deliberadamente baixa; conversa e som do aparelho seguem claros.
+    master.gain.setTargetAtTime(0.55, ctx.currentTime, 1.2);
     return true;
   }
 
