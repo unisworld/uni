@@ -53,28 +53,23 @@ const pool = process.env.DATABASE_URL
       idleTimeoutMillis: 10_000,
     })
   : null;
-let dbClient = null;
+if (pool) {
+  pool.on("error", (err) => console.error("Conexão PostgreSQL ociosa encerrada; será aberta novamente sob demanda.", err.code || "erro de conexão"));
+}
 
 async function load() {
   if (pool) {
-    dbClient = await pool.connect();
-    const lock = await dbClient.query("SELECT pg_try_advisory_lock(731942105)");
-    if (!lock.rows[0]?.pg_try_advisory_lock) {
-      dbClient.release();
-      dbClient = null;
-      throw new Error("Outra instância do UniWorld já mantém o lock exclusivo do banco.");
-    }
-    await dbClient.query(`CREATE TABLE IF NOT EXISTS uniworld_state (
+    await pool.query(`CREATE TABLE IF NOT EXISTS uniworld_state (
       id smallint PRIMARY KEY CHECK (id = 1),
       data jsonb NOT NULL,
       updated_at timestamptz NOT NULL DEFAULT now()
     )`);
-    const result = await dbClient.query("SELECT data FROM uniworld_state WHERE id = 1");
+    const result = await pool.query("SELECT data FROM uniworld_state WHERE id = 1");
     let raw = result.rows[0]?.data;
     if (!raw) {
       // Importa automaticamente os dados antigos do JSON, caso existam.
       try { raw = JSON.parse(await readFile(STORE, "utf8")); } catch { raw = null; }
-      if (raw) await dbClient.query("INSERT INTO uniworld_state (id, data) VALUES (1, $1::jsonb) ON CONFLICT (id) DO NOTHING", [JSON.stringify(raw)]);
+      if (raw) await pool.query("INSERT INTO uniworld_state (id, data) VALUES (1, $1::jsonb) ON CONFLICT (id) DO NOTHING", [JSON.stringify(raw)]);
     }
     if (raw) {
       db.parts = Array.isArray(raw.parts) ? raw.parts : [];
@@ -99,7 +94,7 @@ async function load() {
 async function persist() {
   const snapshot = JSON.stringify({ parts: db.parts, clues: db.clues, devices: db.devices, signs: db.signs, rejected: db.rejected });
   if (pool) {
-    await dbClient.query(`INSERT INTO uniworld_state (id, data, updated_at) VALUES (1, $1::jsonb, now())
+    await pool.query(`INSERT INTO uniworld_state (id, data, updated_at) VALUES (1, $1::jsonb, now())
       ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`, [snapshot]);
     return;
   }
@@ -648,7 +643,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
 
   process.on("SIGTERM", async () => {
     server.close(async () => {
-      if (dbClient) { try { await dbClient.query("SELECT pg_advisory_unlock(731942105)"); } catch {} dbClient.release(); }
       if (pool) await pool.end();
       process.exit(0);
     });

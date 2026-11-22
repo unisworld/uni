@@ -98,7 +98,7 @@ Uso livre. Crédito: Vinícius Gabriel.
 
 ## Limitações da persistência e operação
 
-O servidor mantém o estado em memória e grava o snapshot inteiro em uma linha JSONB. Em PostgreSQL, um advisory lock impede que duas instâncias desta versão compartilhem o mesmo banco simultaneamente; uma segunda instância falha ao iniciar, em vez de competir e sobrescrever snapshots. Isso **não** torna o modelo distribuído nem substitui tabelas normalizadas, transações e controles de concorrência; execute uma instância e faça backups. O modo JSON local não é adequado a hospedagem com disco efêmero.
+O servidor mantém o estado em memória e grava o snapshot inteiro em uma linha JSONB. Execute **uma única instância**: o snapshot não oferece coordenação entre processos nem entre implantações simultâneas. O pool PostgreSQL reabre conexões ociosas depois que o endpoint serverless suspende; a primeira requisição após suspensão pode demorar. Isso **não** torna o modelo distribuído nem substitui tabelas normalizadas, transações e controles de concorrência; faça backups. O modo JSON local não é adequado a hospedagem com disco efêmero.
 
 A API limita corpos JSON a 16 KiB, encerra requisições lentas, limita a fila, aplica até 120 chamadas de API por IP por minuto e não confia em cabeçalhos de IP enviados pelo cliente por padrão. São defesas básicas, não mitigação completa de DDoS: use também limites de borda/WAF, observabilidade e estratégia de recuperação. O ambiente precisa de `REVEAL_PASSPHRASE` com segredo aleatório de alta entropia (p. ex. gerado por `openssl rand -hex 32`); o teste local usa apenas um valor descartável. A mensagem final só é revelada quando o estado atinge a contagem de conclusão, o que não impede fraude de contribuição para forçar essa condição.
 

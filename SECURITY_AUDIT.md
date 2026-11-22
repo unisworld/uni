@@ -8,7 +8,7 @@
 - **Revelação de pistas personalizadas:** o endpoint público da peça não retorna o texto de pistas personalizadas antes da coleta autorizada. A coleta autenticada retorna o texto revelado. Coordenadas e sementes continuam expostas ao cliente para o jogo e não são prova de presença.
 - **Redução de falsificação/fingerprinting:** substituído o fingerprint de canvas/GPU/fontes/hardware por ID aleatório guardado no perfil do navegador; a interface e o README agora dizem explicitamente que não se garante uma peça por aparelho.
 - **DoS básico:** corpos JSON limitados a 16 KiB, timeout da requisição de 15 s, fila de no máximo 100 requisições, até 120 chamadas de API por IP por minuto, resposta 413/400/415 apropriada e cabeçalhos de segurança. IP encaminhado por cabeçalhos só é aceito com `TRUST_PROXY=1`.
-- **Persistência:** escrita do JSON de desenvolvimento via arquivo temporário + rename atômico. PostgreSQL agora usa conexão dedicada e advisory lock para recusar outra instância desta versão usando o mesmo banco, evitando que snapshots simultâneos se sobrescrevam.
+- **Persistência:** escrita do JSON de desenvolvimento via arquivo temporário + rename atômico. PostgreSQL usa `Pool` e trata erros de conexões ociosas (Neon pode encerrar compute por inatividade); a próxima consulta abre conexão sob demanda. O serviço deve operar com uma instância única.
 - **Limite por identificador:** passou a aplicar efetivamente 12 contribuições em 24 h por `ownerId`, além do intervalo de 90 s já existente. É uma barreira de conveniência, não identidade verificada.
 - README atualizado com limitações, operação e instruções de teste.
 
@@ -18,10 +18,10 @@
 2. **Compatibilidade de dados existentes:** registros antigos sem `access_hash` não podem ser editados pelas novas rotas. Antes de migrar um banco real, o operador precisa definir e testar um procedimento seguro de verificação/rotação dos tokens; não reintroduzir autenticação pelo fingerprint como fallback.
 3. **Revelação final:** `/api/state` publica deliberadamente a chave quando a contagem chega a 2.000. Como as contribuições ainda podem ser falsificadas com novos perfis/IPs, um atacante coordenado pode tentar preencher o mundo e forçar a revelação. A regra “uma contribuição por pessoa/aparelho” não é uma barreira criptográfica.
 4. **Coleta de pista:** coordenadas e sementes são enviadas ao navegador e a API recebe coordenadas do cliente; um participante autenticado pode falsificar movimento e coletar sem caminhar. A mudança protege o progresso contra `ownerId` arbitrário, não prova presença física.
-5. **DDoS e concorrência:** limites são locais ao processo e não substituem WAF/limites de borda. O PostgreSQL continua como snapshot JSONB completo em memória, não é modelo multi-instância; o lock só protege instâncias que adotem o mesmo advisory lock. Migração de dados normalizados/transações continua recomendada.
+5. **DDoS e concorrência:** limites são locais ao processo e não substituem WAF/limites de borda. O PostgreSQL continua como snapshot JSONB completo em memória, não é modelo multi-instância; duas instâncias podem competir e sobrescrever estado. Migração de dados normalizados/transações ou coordenação antes de escalar continua recomendada.
 6. **Chave de revelação e implantação:** comprimento mínimo não garante entropia. Configurar segredo aleatório de alta entropia; usar HTTPS e `NODE_ENV=production` para cookie `Secure`. Configurar `TRUST_PROXY=1` somente se o proxy confiável sobrescrever os cabeçalhos recebidos. A resposta final continua pública por projeto.
 7. **Cliente/supply chain:** não foi criada CSP estrita, pois o site usa importmap, estilos dinâmicos e módulos externos (`three` via esm.sh). Recomenda-se empacotar/servir dependências localmente e construir CSP com nonce/hash antes de produção.
-8. **Produção antiga:** código anterior não usa o advisory lock. Não executar a versão antiga em paralelo com esta sobre o mesmo banco; o lock não controla clientes que não o respeitam.
+8. **Neon/serverless:** o endpoint gratuito suspende compute após inatividade; uma conexão ociosa pode ser terminada administrativamente. O pool agora trata esse erro e abre conexão sob demanda, mas o primeiro acesso pode demorar e precisa de validação no host após períodos de suspensão.
 
 ## Testes
 
