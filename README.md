@@ -2,17 +2,20 @@
 
 Um mundo comum que só existe quando duas mil pessoas diferentes doam uma peça cada.
 
-Este pacote é independente: nenhum serviço de terceiro, nenhuma conta, nenhum rastreamento. É só um site estático com um servidor de referência em Node.
+O frontend é estático, mas as contribuições e o mapa compartilhado dependem da API Node. Em produção, o backend usa PostgreSQL persistente quando `DATABASE_URL` está configurada; sem ela, usa JSON local apenas para desenvolvimento.
 
 ## Rodar
 
 ```bash
-node server.mjs
+npm install
+npm start
 ```
 
 Abre em `http://localhost:3000`. Node 18 ou mais novo. Não há `npm install`: o servidor usa apenas módulos nativos e o navegador carrega o Three.js por CDN.
 
-Para publicar: qualquer host que rode Node (Fly, Render, Railway, uma VPS) serve. Se preferir um host só de arquivos estáticos, o mapa funciona, mas sem API — as peças precisam do servidor.
+Para publicar a aplicação completa, use um host Node ligado a PostgreSQL (por exemplo, Render ou Railway). Configure `DATABASE_URL`, `REVEAL_PASSPHRASE` (segredo aleatório de pelo menos 32 caracteres) e `PORT` no ambiente do serviço. O processo Node serve frontend e API na mesma origem. GitHub Pages e Neocities só hospedam o frontend estático e não executam a API.
+
+**Segredo da mensagem:** `REVEAL_PASSPHRASE` não pode ser incluída no Git. O conteúdo de `assets/sealed.json` foi cifrado novamente; mantenha a frase apenas nas variáveis secretas do host. Sem essa variável o servidor não inicia. Nunca publique a frase nem o texto final antes de decidir que ele pode ser revelado.
 
 ## Estrutura
 
@@ -90,3 +93,9 @@ Estas escolhas foram tomadas para caber em uma primeira entrega que roda de verd
 ## Licença
 
 Uso livre. Crédito: Vinícius Gabriel.
+
+## Limitações da persistência
+
+O servidor atual mantém o estado em memória e o grava inteiro em uma linha JSONB do PostgreSQL. Execute **uma única instância**, sem múltiplos processos ou réplicas. Para escalar com segurança, migre para tabelas e transações com controles de concorrência. Faça backups do banco. Não use o JSON local em hospedagem de disco efêmero.
+
+A impressão digital não é autenticação segura: ela pode ser forjada. A regra de um mundo por aparelho é uma barreira de conveniência, não uma garantia. Reveja autenticação, moderação, limites de requisições e privacidade antes de abrir ao público.

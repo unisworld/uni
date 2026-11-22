@@ -1,8 +1,9 @@
-// server.mjs — servidor de referência do uniworld. Node 18+, zero dependências.
-// Guarda tudo em data/parts.json. Troque por Postgres/KV quando for ao ar.
+// Backend do UniWorld: PostgreSQL em produção, JSON local para desenvolvimento.
 
 import { createServer } from "node:http";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
+import pg from "pg";
+const { Pool } = pg;
 import { createHash, randomBytes } from "node:crypto";
 import { join, extname, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,30 +33,68 @@ const BORDERS = [
 ];
 const BORDER_RESERVE = 40;
 
-// Só existe aqui, no servidor. A chave da mensagem final é derivada desta frase
-// e só é entregue quando as duas mil peças estiverem no lugar.
-const REVEAL_PASSPHRASE = "f0f3de0f08106e8593cf9beeba87efd2e52cdec564dc69ce";
+// Segredo fornecido pelo ambiente de produção, nunca versionado.
+// Gere um valor aleatório forte e configure REVEAL_PASSPHRASE no host.
+const REVEAL_PASSPHRASE = process.env.REVEAL_PASSPHRASE || "";
+if (REVEAL_PASSPHRASE.length < 32) {
+  throw new Error("Configure REVEAL_PASSPHRASE (mínimo 32 caracteres) nas variáveis de ambiente.");
+}
 
 const CLIMATES = ["claro", "chuva", "neve", "névoa", "vento"];
 
 const db = { parts: [], clues: [], devices: [], signs: [], rejected: 0 };
 
+const pool = process.env.DATABASE_URL
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: true },
+      max: 5,
+    })
+  : null;
+
 async function load() {
+  if (pool) {
+    await pool.query(`CREATE TABLE IF NOT EXISTS uniworld_state (
+      id smallint PRIMARY KEY CHECK (id = 1),
+      data jsonb NOT NULL,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )`);
+    const result = await pool.query("SELECT data FROM uniworld_state WHERE id = 1");
+    let raw = result.rows[0]?.data;
+    if (!raw) {
+      // Importa automaticamente os dados antigos do JSON, caso existam.
+      try { raw = JSON.parse(await readFile(STORE, "utf8")); } catch { raw = null; }
+      if (raw) await pool.query("INSERT INTO uniworld_state (id, data) VALUES (1, $1::jsonb) ON CONFLICT (id) DO NOTHING", [JSON.stringify(raw)]);
+    }
+    if (raw) {
+      db.parts = Array.isArray(raw.parts) ? raw.parts : [];
+      db.clues = Array.isArray(raw.clues) ? raw.clues : [];
+      db.devices = Array.isArray(raw.devices) ? raw.devices : [];
+      db.signs = Array.isArray(raw.signs) ? raw.signs : [];
+      db.rejected = Number(raw.rejected) || 0;
+    }
+    return;
+  }
+  // Desenvolvimento local continua funcionando sem PostgreSQL.
   try {
     const raw = JSON.parse(await readFile(STORE, "utf8"));
     db.parts = Array.isArray(raw.parts) ? raw.parts : [];
     db.clues = Array.isArray(raw.clues) ? raw.clues : [];
     db.devices = Array.isArray(raw.devices) ? raw.devices : [];
     db.signs = Array.isArray(raw.signs) ? raw.signs : [];
-    db.rejected = raw.rejected || 0;
-  } catch {
-    /* primeira execução */
-  }
+    db.rejected = Number(raw.rejected) || 0;
+  } catch { /* primeira execução local */ }
 }
 
 async function persist() {
+  const snapshot = JSON.stringify({ parts: db.parts, clues: db.clues, devices: db.devices, signs: db.signs, rejected: db.rejected });
+  if (pool) {
+    await pool.query(`INSERT INTO uniworld_state (id, data, updated_at) VALUES (1, $1::jsonb, now())
+      ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`, [snapshot]);
+    return;
+  }
   await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(STORE, JSON.stringify(db, null, 2));
+  await writeFile(STORE, JSON.stringify(JSON.parse(snapshot), null, 2));
 }
 
 const sha256 = (text) => createHash("sha256").update(text).digest("hex");
@@ -351,6 +390,8 @@ const MIME = {
 
 async function serveStatic(res, pathname) {
   const rel = pathname === "/" ? "index.html" : decodeURIComponent(pathname).replace(/^\/+/, "");
+  // Nunca sirva código do servidor, configuração, arquivos de dados ou o ZIP antigo.
+  if (rel !== "index.html" && !rel.startsWith("assets/") && rel !== "PLANO.md") return send(res, 404, { error: "não encontrado." });
   const target = normalize(join(ROOT, rel));
   if (!target.startsWith(ROOT.endsWith(sep) ? ROOT : ROOT + sep)) return send(res, 403, { error: "fora do diretório." });
   try {
@@ -374,7 +415,7 @@ function clientIp(req) {
   return raw.replace(/^::ffff:/, "").slice(0, 64);
 }
 
-const server = createServer(async (req, res) => {
+async function handleRequest(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const path = url.pathname;
 
@@ -461,11 +502,29 @@ const server = createServer(async (req, res) => {
 
     return send(res, 404, { error: "rota desconhecida." });
   } catch (err) {
-    return send(res, 500, { error: err.message });
+    console.error("Erro na API:", err);
+    // Recarrega o último estado salvo se uma gravação falhar.
+    try { await load(); } catch (loadError) { console.error("Erro ao recarregar:", loadError); }
+    return send(res, 500, { error: "erro interno do servidor." });
   }
+}
+
+// Serializa acessos ao estado em memória para evitar gravações concorrentes
+// dentro de um único processo. Use exatamente uma instância do serviço.
+let queue = Promise.resolve();
+const server = createServer((req, res) => {
+  queue = queue.then(() => handleRequest(req, res)).catch((err) => {
+    console.error("Erro de requisição:", err);
+    if (!res.headersSent) send(res, 500, { error: "erro interno do servidor." });
+    else res.end();
+  });
 });
 
 await load();
 server.listen(PORT, () => {
-  console.log(`uniworld em http://localhost:${PORT} · ${db.parts.length}/${TOTAL} partes`);
+  console.log(`uniworld em http://localhost:${PORT} · ${db.parts.length}/${TOTAL} partes · ${pool ? "PostgreSQL persistente" : "JSON local"}`);
+});
+
+process.on("SIGTERM", async () => {
+  server.close(async () => { if (pool) await pool.end(); process.exit(0); });
 });
