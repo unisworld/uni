@@ -188,7 +188,7 @@ function layout(inner) {
   return `<header class="site"><div class="wrap">
       <a class="brand" href="#/">${LOGO}<span>uniworld</span></a>
       <nav class="site">
-        <a href="#/">mapa</a><a href="#/editar">meu mundo</a><a href="#/estado">estado</a><a href="#/sobre">sobre</a><a href="#/regras">regras</a>
+        <a href="#/">mapa</a><a href="#/editar">meu mundo</a><a href="#/estado">estado</a><a href="#/sobre">sobre</a><a href="#/regras">regras</a><a href="https://uniworld.neocities.org/game/index">Jogue</a><a href="https://uniworld.neocities.org/">Descubra</a>
       </nav>
     </div></header>
     <main class="wrap">${inner}</main>
