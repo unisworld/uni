@@ -629,3 +629,72 @@ textarea:focus {
     letter-spacing: 0.1em;
   }
 }
+
+/* Layout adaptável para navegação, conteúdo e controles do mundo. */
+header.site .wrap {
+  height: auto;
+  min-height: 64px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.brand { flex: 0 0 auto; }
+nav.site { justify-content: flex-end; min-width: 0; row-gap: 4px; }
+nav.site a { display: inline-flex; align-items: center; min-height: 36px; }
+.hero > *, .world > *, .stats > *, .list li > * { min-width: 0; }
+.hero { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) {
+  .hero { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .world { grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.65fr); }
+}
+.stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.stats dt, .list li, .prose, .hint, .side, footer.site { overflow-wrap: anywhere; }
+.map-wrap { min-width: 0; max-width: 100%; }
+.realm-host canvas { display: block; max-width: 100%; }
+.hud-top { align-items: flex-start; }
+.hud-btns { min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
+.hud-btns .btn { white-space: nowrap; }
+.bubble { top: 118px; }
+
+@media (max-width: 760px) {
+  header.site { position: relative; }
+  header.site .wrap { flex-wrap: wrap; gap: 2px 12px; padding-top: 10px; padding-bottom: 8px; }
+  nav.site { width: 100%; justify-content: flex-start; column-gap: 16px; }
+  .hero { gap: 28px; padding-top: 36px; }
+  .map { min-width: 0; width: 100%; }
+  .panel { padding: 20px; }
+  .stage { height: 60vh; min-height: 430px; }
+  .hud-top { flex-wrap: wrap; }
+  .hud-btns { flex: 1 1 100%; justify-content: flex-start; gap: 6px; }
+  .hud-btns .btn { padding: 10px; min-height: 40px; font-size: 10px; letter-spacing: 0.1em; }
+  .bubble { top: 150px; }
+}
+@media (max-width: 560px) {
+  .wrap { padding-left: 16px; padding-right: 16px; }
+  nav.site { column-gap: 12px; letter-spacing: 0.12em; }
+  nav.site a { min-height: 36px; }
+  .stats { gap: 8px; }
+  .stats dt { font-size: 9px; letter-spacing: 0.08em; }
+  .list li { flex-wrap: wrap; gap: 4px 12px; }
+  .side { padding: 20px; }
+  .stage .hud-top { gap: 6px; padding: 8px; }
+  .stage .hud-btns { max-width: none; justify-content: flex-start; }
+  .stage .hud-btns .btn { padding: 9px; font-size: 9px; letter-spacing: 0.08em; }
+  .stage .collect { left: auto; right: 12px; bottom: 24px; max-width: calc(100% - 150px); transform: none; }
+  .stage:fullscreen .collect, .stage.is-world-fullscreen-fallback .collect {
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(24px, env(safe-area-inset-bottom));
+  }
+}
+@media (max-width: 360px) {
+  .wrap { padding-left: 12px; padding-right: 12px; }
+  .btn { padding-left: 12px; padding-right: 12px; }
+  .panel { padding: 16px; }
+  .pad { width: 96px; height: 96px; left: 12px; bottom: 12px; }
+  .stage .collect { max-width: calc(100% - 120px); }
+}
+@media (max-width: 560px) {
+  .stage:fullscreen .hud-btns,
+  .stage.is-world-fullscreen-fallback .hud-btns { max-width: 100%; flex-basis: 100%; justify-content: flex-start; }
+  .stage .bubble { max-height: min(30vh, 160px); overflow: auto; }
+}
